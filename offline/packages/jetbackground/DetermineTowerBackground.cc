@@ -27,6 +27,10 @@
 #include <phool/PHObject.h>
 #include <phool/getClass.h>
 #include <phool/phool.h>
+#include <phool/recoConsts.h>
+
+#include <ffaobjects/EventHeader.h>
+#include <dbtools/ReadCalib.h>
 
 #include <TLorentzVector.h>
 
@@ -53,12 +57,41 @@ DetermineTowerBackground::DetermineTowerBackground(const std::string &name)
   , _seed_type(0)
   , _seed_jet_D(3.0)
   , _seed_jet_pt(7.0)
+  , m_runNumber(-1)
 {
   _UE.resize(3, std::vector<float>(1, 0));
+  m_UEscalefactor.resize(3, std::vector<float>(24,0));
 }
 
 int DetermineTowerBackground::InitRun(PHCompositeNode *topNode)
 {
+  EventHeader* evtHeader = findNode::getClass<EventHeader>(topNode, "EventHeader");
+
+  if (evtHeader)
+  {
+    m_runNumber = evtHeader->get_RunNumber();
+  }
+  else
+  {
+    m_runNumber = -1;
+  }
+  if(Verbosity() > 0) std::cout << "at run" << m_runNumber << std::endl;
+  recoConsts *rc = recoConsts::instance();
+  rc->set_StringFlag("CDB_GLOBALTAG", "vbailey");
+  ReadCalib *rb = new ReadCalib();
+  std::string calibdir = rb->getCalibrationFile("TestBeginValidity", m_runNumber);
+  if(Verbosity() > 0) std::cout << "Getting calibration file: " << calibdir << std::endl;
+  if (calibdir[0] == '/')
+    {
+      cdbttree = new CDBTTree(calibdir.c_str());
+    }
+  else
+    {
+      std::cout << calibdir << std::endl;
+      exit(1);
+    }
+  GetUEShape();
+
   return CreateNode(topNode);
 }
 
@@ -665,10 +698,16 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
     int local_max_eta = _HCAL_NETA;
     int local_max_phi = _HCAL_NPHI;
 
+    int towers_in_layer = 0;
+    float total_layer_E = 0;
+
+    int isNoTowers[local_max_eta];
+
     for (int eta = 0; eta < local_max_eta; eta++)
     {
       float total_E = 0;
       int total_tower = 0;
+      isNoTowers[eta] = false;
 
       for (int phi = 0; phi < local_max_phi; phi++)
       {
@@ -694,10 +733,11 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
         if (!isExcluded)
         {
           if (layer == 0) total_E += _EMCAL_E[eta][phi] / (1 + 2 * _v2 * cos(2 * (this_phi - _Psi2)));
-          if (layer == 1) total_E += _IHCAL_E[eta][phi] / (1 + 2 * _v2 * cos(2 * (this_phi - _Psi2)));
+	  if (layer == 1) total_E += _IHCAL_E[eta][phi] / (1 + 2 * _v2 * cos(2 * (this_phi - _Psi2)));
           if (layer == 2) total_E += _OHCAL_E[eta][phi] / (1 + 2 * _v2 * cos(2 * (this_phi - _Psi2)));
           total_tower++;  // towers in this eta range & layer
-          _nTowers++;     // towers in entire calorimeter
+          towers_in_layer++; // towers in this layer
+	  _nTowers++;     // towers in entire calorimeter
         }
         else
         {
@@ -711,11 +751,44 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
       float deta = etabounds.second - etabounds.first;
       float dphi = phibounds.second - phibounds.first;
       float total_area = total_tower * deta * dphi;
+
+      if(total_tower == 0)
+      {
+	if (Verbosity() > 3)
+	{
+	  std::cout << "DetermineTowerBackground::process_event: There are no towers available in at layer / eta index ( eta range ) = " << layer << " / " << eta << " ( " << etabounds.first << " - " << etabounds.second << " )" << std::endl;
+	}
+	isNoTowers[eta] = true;
+	continue;
+      }
+
+      total_layer_E += total_E;
       _UE[layer].at(eta) = total_E / total_tower;
 
       if (Verbosity() > 3)
       {
         std::cout << "DetermineTowerBackground::process_event: at layer / eta index ( eta range ) = " << layer << " / " << eta << " ( " << etabounds.first << " - " << etabounds.second << " ) , total E / total Ntower / total area = " << total_E << " / " << total_tower << " / " << total_area << " , UE per tower = " << total_E / total_tower << std::endl;
+      }
+    }
+    //check if we had to skip any eta slices
+    for (int eta = 0; eta < local_max_eta; eta++)
+    {
+      if(isNoTowers[eta])
+      {
+	//get the average value of the UE in the full layer and then scale by an eta dependent factor
+	if(towers_in_layer == 0)
+	{
+	  if (Verbosity() > 1)
+	  {
+	    std::cout<<"DetermineTowerBackground::process_event: There are no towers available to determine the UE in this event. Skipping it.";
+	    return Fun4AllReturnCodes::EVENT_OK;
+	  }
+	}
+	_UE[layer].at(eta) = (total_layer_E / towers_in_layer) * m_UEscalefactor[layer].at(eta);
+	if (Verbosity() > 3)
+	{
+	  std::cout << "DetermineTowerBackground::process_event: at layer / eta index = " << layer << " / " << eta << " using scaled average UE due to lack of available towers in eta slice average * weight: " << total_layer_E / towers_in_layer << " * " << m_UEscalefactor[layer].at(eta) <<std::endl;
+	}
       }
     }
   }
@@ -800,4 +873,22 @@ void DetermineTowerBackground::FillNode(PHCompositeNode *topNode)
   }
 
   return;
+}
+
+void DetermineTowerBackground::GetUEShape()
+{
+  if(Verbosity() > 0)
+  { 
+    std::cout<<"Reading eta dependent weights for UE:"<<std::endl;
+  }
+  for (int layer = 0; layer < 3; layer++)
+  {
+      for (int eta = 0; eta < 24; eta++)
+      {
+	std::stringstream ss;
+	ss << std::string("UE_layer") << layer <<  std::string("_eta") << eta;
+	m_UEscalefactor[layer].at(eta) = cdbttree->GetSingleFloatValue(ss.str());
+	if(Verbosity() > 0) std::cout<<"Weight at layer: " << layer << " eta: " << eta << ": " << m_UEscalefactor[layer].at(eta) << std::endl;
+      }
+  }
 }

@@ -27,7 +27,9 @@ libjetbackground_la_LIBADD = \
   -lConstituentSubtractor \
   -lg4jets_io \
   -lphg4hit \
-  -lSubsysReco
+  -lSubsysReco \
+  -lcdbobjects \
+  -ldbtools 
 
 pkginclude_HEADERS = \
   DetermineTowerBackground.h \

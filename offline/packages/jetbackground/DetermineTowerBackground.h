@@ -9,6 +9,15 @@
 
 #include <fun4all/SubsysReco.h>
 
+#include <phool/PHCompositeNode.h>
+#include <phool/PHIODataNode.h>    // for PHIODataNode
+#include <phool/PHNodeIterator.h>  // for PHNodeIterator
+#include <phool/PHObject.h>        // for PHObject
+#include <phool/getClass.h>
+#include <phool/phool.h>
+
+#include <cdbobjects/CDBTTree.h>
+
 // system includes
 #include <string>
 #include <vector>
@@ -46,6 +55,7 @@ class DetermineTowerBackground : public SubsysReco
  private:
   int CreateNode(PHCompositeNode *topNode);
   void FillNode(PHCompositeNode *topNode);
+  void GetUEShape();
 
   int _do_flow;
   float _v2;
@@ -77,6 +87,9 @@ class DetermineTowerBackground : public SubsysReco
 
   bool m_use_towerinfo = false;
 
+  CDBTTree *cdbttree = nullptr;
+  int m_runNumber;
+  std::vector<std::vector<float> > m_UEscalefactor;
 };
 
 #endif
