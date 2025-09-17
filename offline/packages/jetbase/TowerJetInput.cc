@@ -10,6 +10,7 @@
 #include <calobase/RawTowerGeomContainer.h>
 #include <calobase/TowerInfo.h>
 #include <calobase/TowerInfoContainer.h>
+#include <calobase/TowerInfoDefs.h>
 #include <globalvertex/GlobalVertex.h>
 #include <globalvertex/GlobalVertexMap.h>
 
@@ -164,7 +165,8 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
   TowerInfoContainer *towerinfos = nullptr;
   RawTowerGeomContainer *geom = nullptr;
   RawTowerGeomContainer *EMCal_geom = nullptr;
-
+  RawTowerGeomContainer *OHCal_geom = nullptr;
+ 
   if (m_input == Jet::CEMC_TOWER)
   {
     towers = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_CEMC");
@@ -439,10 +441,36 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
       return std::vector<Jet *>();
     }
   }
+  else if (m_input == Jet::SUPER_TOWERINFO)
+  {
+    m_use_towerinfo = true;
+    towerName = m_towerNodePrefix + "_SUPER";
+    towerinfos = findNode::getClass<TowerInfoContainer>(topNode, towerName);
+    geocaloid = RawTowerDefs::CalorimeterId::HCALIN;
+    geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALIN");
+    if ((!towerinfos) || !geom)
+      {
+	return std::vector<Jet *>();
+      }
+  }
+  else if (m_input == Jet::SUPER_TOWERINFO_SUB1)
+  {
+    m_use_towerinfo = true;
+    towerName = m_towerNodePrefix + "_SUPER_SUB1";
+    towerinfos = findNode::getClass<TowerInfoContainer>(topNode, towerName);
+    geocaloid = RawTowerDefs::CalorimeterId::HCALIN;
+    geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALIN");
+    if ((!towerinfos) || !geom)
+      {
+        return std::vector<Jet *>();
+      }
+  }
+
   else
   {
     return std::vector<Jet *>();
   }
+
 
   // for those cases we need to use the EMCal R and IHCal eta phi to calculate the vertex correction
   if (m_input == Jet::CEMC_TOWER_RETOWER || m_input == Jet::CEMC_TOWERINFO_RETOWER || m_input == Jet::CEMC_TOWER_SUB1 || m_input == Jet::CEMC_TOWERINFO_SUB1 || m_input == Jet::CEMC_TOWER_SUB1CS)
@@ -454,6 +482,21 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
     }
   }
 
+  //for the case where we want to calculate a radius for the super tower
+  if (m_input == Jet::SUPER_TOWERINFO || m_input == Jet::SUPER_TOWERINFO_SUB1)
+    {
+      EMCal_geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
+      if (!EMCal_geom)
+	{
+	  return std::vector<Jet *>();
+	}
+      OHCal_geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALOUT");
+      if (!OHCal_geom)
+        {
+          return std::vector<Jet *>();
+        }
+    }
+  
   // first grab the event vertex or bail
 
   std::vector<Jet *> pseudojets;
@@ -475,7 +518,7 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
       int iphi = towerinfos->getTowerPhiBin(calokey);
       const RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(geocaloid, ieta, iphi);
       // skip masked towers
-      if (tower->get_isHot() || tower->get_isNoCalib() || tower->get_isNotInstr() || tower->get_isBadChi2())
+      if (!tower->get_isGood())
       {
         continue;
       }
@@ -494,6 +537,35 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
         assert(EMCal_tower_geom);
         r = EMCal_tower_geom->get_center_radius();
       }
+      
+      if (m_input == Jet::SUPER_TOWERINFO || m_input == Jet::SUPER_TOWERINFO_SUB1)
+      {
+	const RawTowerDefs::keytype EMCal_key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::CEMC, 0, 0);
+        RawTowerGeom *EMCal_tower_geom = EMCal_geom->get_tower_geometry(EMCal_key);
+        assert(EMCal_tower_geom);
+
+	const RawTowerDefs::keytype OHCal_key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::HCALOUT, 0, 0);
+        RawTowerGeom *OHCal_tower_geom = OHCal_geom->get_tower_geometry(OHCal_key);
+        assert(OHCal_tower_geom);
+
+	std::string EMtowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+	TowerInfoContainer *EMtowerinfos = findNode::getClass<TowerInfoContainer>(topNode, EMtowerName);
+	TowerInfo *EMtower = EMtowerinfos->get_tower_at_key(TowerInfoDefs::encode_hcal(ieta, iphi));
+	assert(EMtower);
+
+	std::string IHtowerName = m_towerNodePrefix + "_HCALIN";
+        TowerInfoContainer *IHtowerinfos = findNode::getClass<TowerInfoContainer>(topNode, IHtowerName);
+        TowerInfo *IHtower = IHtowerinfos->get_tower_at_key(TowerInfoDefs::encode_hcal(ieta, iphi));
+        assert(IHtower);
+
+	std::string OHtowerName = m_towerNodePrefix + "_HCALOUT";
+        TowerInfoContainer *OHtowerinfos = findNode::getClass<TowerInfoContainer>(topNode, OHtowerName);
+        TowerInfo *OHtower = OHtowerinfos->get_tower_at_key(TowerInfoDefs::encode_hcal(ieta, iphi));
+        assert(OHtower);
+	
+	r = (EMCal_tower_geom->get_center_radius() * EMtower->get_energy() + tower_geom->get_center_radius() * IHtower->get_energy() + OHCal_tower_geom->get_center_radius() * OHtower->get_energy())/tower->get_energy();
+      }
+      
       double phi = atan2(tower_geom->get_center_y(), tower_geom->get_center_x());
       double towereta = tower_geom->get_eta();
       double z0 = sinh(towereta) * r;
