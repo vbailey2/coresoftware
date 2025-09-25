@@ -61,7 +61,8 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
 
   if (m_use_towerinfo)
   {
-    EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+    EMTowerName = m_towerNodePrefix + "_CEMC";
+    if(m_use_retower) m_towerNodePrefix + "_CEMC_RETOWER";
     IHTowerName = m_towerNodePrefix + "_HCALIN";
     OHTowerName = m_towerNodePrefix + "_HCALOUT";
     towerinfosEM3 = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
@@ -75,20 +76,8 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       std::cout << "SubtractTowers::process_event: " << towerinfosOH3->size() << OHTowerName << " towers" << std::endl;
     }
   }
-  else
-  {
-    towersEM3 = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_CEMC_RETOWER");
-    towersIH3 = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALIN");
-    towersOH3 = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALOUT");
 
-    if (Verbosity() > 0)
-    {
-      std::cout << "SubtractTowers::process_event: " << towersEM3->size() << " TOWER_CALIB_CEMC_RETOWER towers" << std::endl;
-      std::cout << "SubtractTowers::process_event: " << towersIH3->size() << " TOWER_CALIB_HCALIN towers" << std::endl;
-      std::cout << "SubtractTowers::process_event: " << towersOH3->size() << " TOWER_CALIB_HCALOUT towers" << std::endl;
-    }
-  }
-
+  RawTowerGeomContainer *geomEM = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
   RawTowerGeomContainer *geomIH = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALIN");
   RawTowerGeomContainer *geomOH = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALOUT");
 
@@ -101,18 +90,19 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
   TowerInfoContainer *ohcal_towerinfos = nullptr;
   if (m_use_towerinfo)
   {
-    EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER_SUB1";
+    EMTowerName = m_towerNodePrefix + "_CEMC_SUB1";
+    if(m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER_SUB1";
     IHTowerName = m_towerNodePrefix + "_HCALIN_SUB1";
     OHTowerName = m_towerNodePrefix + "_HCALOUT_SUB1";
     emcal_towerinfos = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
     ihcal_towerinfos = findNode::getClass<TowerInfoContainer>(topNode, IHTowerName);
     ohcal_towerinfos = findNode::getClass<TowerInfoContainer>(topNode, OHTowerName);
-  }
-  if (Verbosity() > 0)
-  {
-    std::cout << "SubtractTowers::process_event: starting with " << emcal_towerinfos->size() << EMTowerName << " towers" << std::endl;
-    std::cout << "SubtractTowers::process_event: starting with " << ihcal_towerinfos->size() << IHTowerName << " towers" << std::endl;
-    std::cout << "SubtractTowers::process_event: starting with " << ohcal_towerinfos->size() << OHTowerName << " towers" << std::endl;
+    if (Verbosity() > 0)
+      {
+	std::cout << "SubtractTowers::process_event: starting with " << emcal_towerinfos->size() << EMTowerName << " towers" << std::endl;
+	std::cout << "SubtractTowers::process_event: starting with " << ihcal_towerinfos->size() << IHTowerName << " towers" << std::endl;
+	std::cout << "SubtractTowers::process_event: starting with " << ohcal_towerinfos->size() << OHTowerName << " towers" << std::endl;
+      }
   }
 
   else

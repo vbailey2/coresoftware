@@ -48,6 +48,10 @@ class DetermineTowerBackground : public SubsysReco
   {
     m_use_towerinfo = use_towerinfo;
   }
+  void set_retower(bool use_retower)
+  {
+    m_use_retower = use_retower;
+  }
   void set_towerNodePrefix(const std::string &prefix)
   {
     m_towerNodePrefix = prefix;
@@ -68,7 +72,8 @@ class DetermineTowerBackground : public SubsysReco
 
   int _HCAL_NETA{-1};
   int _HCAL_NPHI{-1};
-
+  int _EMCAL_NETA{-1};
+  int _EMCAL_NPHI{-1};
   
   std::vector<std::vector<float> > _EMCAL_E;
   std::vector<std::vector<float> > _IHCAL_E;
@@ -102,6 +107,7 @@ class DetermineTowerBackground : public SubsysReco
   Jet::PROPERTY _index_SeedItr{};
 
   bool m_use_towerinfo{false};
+  bool m_use_retower{false};
   bool _is_flow_failure{false};
   bool _reweight_failed{false};
 

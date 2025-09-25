@@ -60,7 +60,8 @@ int CopyAndSubtractJets::process_event(PHCompositeNode *topNode)
   TowerInfoContainer *towerinfosOH3 = nullptr;
   if (m_use_towerinfo)
   {
-    EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+    if(m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+    else EMTowerName = m_towerNodePrefix + "_CEMC";
     IHTowerName = m_towerNodePrefix + "_HCALIN";
     OHTowerName = m_towerNodePrefix + "_HCALOUT";
     towerinfosEM3 = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
@@ -82,13 +83,8 @@ int CopyAndSubtractJets::process_event(PHCompositeNode *topNode)
       exit(1);
     }
   }
-  else
-  {
-    towersEM3 = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_CEMC_RETOWER");
-    towersIH3 = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALIN");
-    towersOH3 = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALOUT");
-  }
 
+  RawTowerGeomContainer *geomEM = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
   RawTowerGeomContainer *geomIH = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALIN");
   RawTowerGeomContainer *geomOH = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALOUT");
 
@@ -102,12 +98,7 @@ int CopyAndSubtractJets::process_event(PHCompositeNode *topNode)
     sub_jets = findNode::getClass<JetContainer>(topNode, "AntiKt_TowerInfo_HIRecoSeedsSub_r02");
     background = findNode::getClass<TowerBackground>(topNode, "TowerInfoBackground_Sub1");
   }
-  else
-  {
-    unsub_jets = findNode::getClass<JetContainer>(topNode, "AntiKt_Tower_HIRecoSeedsRaw_r02");
-    sub_jets = findNode::getClass<JetContainer>(topNode, "AntiKt_Tower_HIRecoSeedsSub_r02");
-    background = findNode::getClass<TowerBackground>(topNode, "TowerBackground_Sub1");
-  }
+
   std::vector<float> background_UE_0 = background->get_UE(0);
   std::vector<float> background_UE_1 = background->get_UE(1);
   std::vector<float> background_UE_2 = background->get_UE(2);
@@ -178,7 +169,7 @@ int CopyAndSubtractJets::process_event(PHCompositeNode *topNode)
           tower_geom = geomOH->get_tower_geometry(key);
           comp_background = background_UE_2.at(comp_ieta);
         }
-        else if (comp.first == 13 || comp.first == 28)
+        else if ((comp.first == 13 || comp.first == 28) && m_use_retower)
         {
           towerinfo = towerinfosEM3->get_tower_at_channel(comp.second);
           unsigned int towerkey = towerinfosEM3->encode_key(comp.second);
@@ -189,40 +180,20 @@ int CopyAndSubtractJets::process_event(PHCompositeNode *topNode)
           tower_geom = geomIH->get_tower_geometry(key);
           comp_background = background_UE_0.at(comp_ieta);
         }
+	else if (comp.first == 13 || comp.first == 28)
+	{
+	  towerinfo = towerinfosEM3->get_tower_at_channel(comp.second);
+          unsigned int towerkey = towerinfosEM3->encode_key(comp.second);
+          comp_ieta = towerinfosEM3->getTowerEtaBin(towerkey);
+          int comp_iphi = towerinfosEM3->getTowerPhiBin(towerkey);
+	  const RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::CEMC,comp_ieta, comp_iphi);
+
+          tower_geom = geomEM->get_tower_geometry(key);
+          comp_background = background_UE_0.at(comp_ieta);
+	}
         if (towerinfo)
         {
           comp_e = towerinfo->get_energy();
-        }
-      }
-      else
-      {
-        if (comp.first == 5)
-        {
-          tower = towersIH3->getTower(comp.second);
-          tower_geom = geomIH->get_tower_geometry(tower->get_key());
-
-          comp_ieta = geomIH->get_etabin(tower_geom->get_eta());
-          comp_background = background_UE_1.at(comp_ieta);
-        }
-        else if (comp.first == 7)
-        {
-          tower = towersOH3->getTower(comp.second);
-          tower_geom = geomOH->get_tower_geometry(tower->get_key());
-
-          comp_ieta = geomOH->get_etabin(tower_geom->get_eta());
-          comp_background = background_UE_2.at(comp_ieta);
-        }
-        else if (comp.first == 13)
-        {
-          tower = towersEM3->getTower(comp.second);
-          tower_geom = geomIH->get_tower_geometry(tower->get_key());
-
-          comp_ieta = geomIH->get_etabin(tower_geom->get_eta());
-          comp_background = background_UE_0.at(comp_ieta);
-        }
-        if (tower)
-        {
-          comp_e = tower->get_energy();
         }
       }
 
