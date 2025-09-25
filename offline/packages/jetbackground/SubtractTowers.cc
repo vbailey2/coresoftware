@@ -52,17 +52,14 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
   }
 
   // pull out the tower containers and geometry objects at the start
-  RawTowerContainer *towersEM3 = nullptr;
-  RawTowerContainer *towersIH3 = nullptr;
-  RawTowerContainer *towersOH3 = nullptr;
   TowerInfoContainer *towerinfosEM3 = nullptr;
   TowerInfoContainer *towerinfosIH3 = nullptr;
   TowerInfoContainer *towerinfosOH3 = nullptr;
 
   if (m_use_towerinfo)
   {
-    EMTowerName = m_towerNodePrefix + "_CEMC";
-    if(m_use_retower) m_towerNodePrefix + "_CEMC_RETOWER";
+    if(m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+    else EMTowerName = m_towerNodePrefix + "_CEMC";
     IHTowerName = m_towerNodePrefix + "_HCALIN";
     OHTowerName = m_towerNodePrefix + "_HCALOUT";
     towerinfosEM3 = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
@@ -77,7 +74,6 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
     }
   }
 
-  RawTowerGeomContainer *geomEM = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
   RawTowerGeomContainer *geomIH = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALIN");
   RawTowerGeomContainer *geomOH = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALOUT");
 
@@ -105,28 +101,8 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       }
   }
 
-  else
-  {
-    emcal_towers = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_CEMC_RETOWER_SUB1");
-    ihcal_towers = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALIN_SUB1");
-    ohcal_towers = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALOUT_SUB1");
-    if (Verbosity() > 0)
-    {
-      std::cout << "SubtractTowers::process_event: starting with " << emcal_towers->size() << " TOWER_CALIB_CEMC_RETOWER_SUB1 towers" << std::endl;
-      std::cout << "SubtractTowers::process_event: starting with " << ihcal_towers->size() << " TOWER_CALIB_HCALIN_SUB1 towers" << std::endl;
-      std::cout << "SubtractTowers::process_event: starting with " << ohcal_towers->size() << " TOWER_CALIB_HCALOUT_SUB1 towers" << std::endl;
-    }
-  }
+  TowerBackground *towerbackground = findNode::getClass<TowerBackground>(topNode, "TowerInfoBackground_Sub2");
 
-  TowerBackground *towerbackground;
-  if (m_use_towerinfo)
-  {
-    towerbackground = findNode::getClass<TowerBackground>(topNode, "TowerInfoBackground_Sub2");
-  }
-  else
-  {
-    towerbackground = findNode::getClass<TowerBackground>(topNode, "TowerBackground_Sub2");
-  }
   // read these in to use, even if we don't use flow modulation in the subtraction
   float background_v2 = towerbackground->get_v2();
   float background_Psi2 = towerbackground->get_Psi2();
@@ -153,7 +129,7 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       }
       float new_energy = raw_energy - UE;
       // if a tower is masked, leave it at zero
-      if (tower->get_isHot() || tower->get_isNoCalib() || tower->get_isNotInstr() || tower->get_isBadChi2())
+      if (!tower->get_isGood())
       {
         new_energy = 0;
       }
@@ -167,59 +143,7 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       }
     }
   }
-  else
-  {
-    RawTowerContainer::ConstRange begin_end_EM = towersEM3->getTowers();
-    for (RawTowerContainer::ConstIterator rtiter = begin_end_EM.first; rtiter != begin_end_EM.second; ++rtiter)
-    {
-      RawTower *tower = rtiter->second;
 
-      int this_etabin = tower->get_bineta();
-      int this_phibin = tower->get_binphi();
-      float this_E = tower->get_energy();
-
-      RawTower *new_tower = new RawTowerv1();
-      new_tower->set_energy(this_E);
-      emcal_towers->AddTower(this_etabin, this_phibin, new_tower);
-    }
-
-    // now fill in additional towers with zero energy to fill out the full grid
-    // but note: after retowering, all of these should already exist...
-    for (int eta = 0; eta < geomIH->get_etabins(); eta++)
-    {
-      for (int phi = 0; phi < geomIH->get_phibins(); phi++)
-      {
-        if (!emcal_towers->getTower(eta, phi))
-        {
-          RawTower *new_tower = new RawTowerv1();
-          new_tower->set_energy(0);
-          emcal_towers->AddTower(eta, phi, new_tower);
-        }
-      }
-    }
-    // update towers for background subtraction...
-    for (RawTowerContainer::ConstIterator rtiter = emcal_towers->getTowers().first; rtiter != emcal_towers->getTowers().second; ++rtiter)
-    {
-      RawTower *tower = rtiter->second;
-      float raw_energy = tower->get_energy();
-      float UE = towerbackground->get_UE(0).at(tower->get_bineta());
-      if (_use_flow_modulation)
-      {
-        float tower_phi = geomIH->get_tower_geometry(tower->get_key())->get_phi();
-        UE = UE * (1 + 2 * background_v2 * std::cos(2 * (tower_phi - background_Psi2)));
-      }
-      float new_energy = raw_energy - UE;
-      if (raw_energy == 0)
-      {
-        new_energy = 0;
-      }
-      tower->set_energy(new_energy);
-      if (Verbosity() > 5)
-      {
-        std::cout << "SubtractTowers::process_event : EMCal tower at eta / phi = " << tower->get_bineta() << " / " << tower->get_binphi() << ", pre-sub / after-sub E = " << raw_energy << " / " << tower->get_energy() << std::endl;
-      }
-    }
-  }
   // IHCal
   // replicate existing towers
   if (m_use_towerinfo)
@@ -242,7 +166,7 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       }
       float new_energy = raw_energy - UE;
       // if a tower is masked, leave it at zero
-      if (tower->get_isHot() || tower->get_isNoCalib() || tower->get_isNotInstr() || tower->get_isBadChi2())
+      if (!tower->get_isGood())
       {
         new_energy = 0;
       }
@@ -255,56 +179,7 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       }
     }
   }
-  else
-  {
-    RawTowerContainer::ConstRange begin_end_IH = towersIH3->getTowers();
-    for (RawTowerContainer::ConstIterator rtiter = begin_end_IH.first; rtiter != begin_end_IH.second; ++rtiter)
-    {
-      RawTower *tower = rtiter->second;
-      RawTowerGeom *tower_geom = geomIH->get_tower_geometry(tower->get_key());
 
-      int this_etabin = geomIH->get_etabin(tower_geom->get_eta());
-      int this_phibin = geomIH->get_phibin(tower_geom->get_phi());
-      float this_E = tower->get_energy();
-
-      RawTower *new_tower = new RawTowerv1();
-      new_tower->set_energy(this_E);
-      ihcal_towers->AddTower(this_etabin, this_phibin, new_tower);
-    }
-
-    // now fill in additional towers with zero energy to fill out the full grid
-    for (int eta = 0; eta < geomIH->get_etabins(); eta++)
-    {
-      for (int phi = 0; phi < geomIH->get_phibins(); phi++)
-      {
-        if (!ihcal_towers->getTower(eta, phi))
-        {
-          RawTower *new_tower = new RawTowerv1();
-          new_tower->set_energy(0);
-          ihcal_towers->AddTower(eta, phi, new_tower);
-        }
-      }
-    }
-
-    // update towers for background subtraction...
-    for (RawTowerContainer::ConstIterator rtiter = ihcal_towers->getTowers().first; rtiter != ihcal_towers->getTowers().second; ++rtiter)
-    {
-      RawTower *tower = rtiter->second;
-      float raw_energy = tower->get_energy();
-      float UE = towerbackground->get_UE(1).at(tower->get_bineta());
-      if (_use_flow_modulation)
-      {
-        float tower_phi = geomIH->get_tower_geometry(tower->get_key())->get_phi();
-        UE = UE * (1 + 2 * background_v2 * std::cos(2 * (tower_phi - background_Psi2)));
-      }
-      float new_energy = raw_energy - UE;
-      if (raw_energy == 0)
-      {
-        new_energy = 0;
-      }
-      tower->set_energy(new_energy);
-    }
-  }
   // OHCal
 
   // replicate existing towers
@@ -327,7 +202,7 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       }
       float new_energy = raw_energy - UE;
       // if a tower is masked, leave it at zero
-      if (tower->get_isHot() || tower->get_isNoCalib() || tower->get_isNotInstr() || tower->get_isBadChi2())
+      if (!tower->get_isGood())
       {
         new_energy = 0;
       }
@@ -338,56 +213,6 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       {
         std::cout << "SubtractTowers::process_event : OHCal tower at ieta / iphi = " << ieta << " / " << iphi << ", pre-sub / after-sub E = " << raw_energy << " / " << new_energy << std::endl;
       }
-    }
-  }
-  else
-  {
-    RawTowerContainer::ConstRange begin_end_OH = towersOH3->getTowers();
-    for (RawTowerContainer::ConstIterator rtiter = begin_end_OH.first; rtiter != begin_end_OH.second; ++rtiter)
-    {
-      RawTower *tower = rtiter->second;
-      RawTowerGeom *tower_geom = geomOH->get_tower_geometry(tower->get_key());
-
-      int this_etabin = geomOH->get_etabin(tower_geom->get_eta());
-      int this_phibin = geomOH->get_phibin(tower_geom->get_phi());
-      float this_E = tower->get_energy();
-
-      RawTower *new_tower = new RawTowerv1();
-      new_tower->set_energy(this_E);
-      ohcal_towers->AddTower(this_etabin, this_phibin, new_tower);
-    }
-
-    // now fill in additional towers with zero energy to fill out the full grid
-    for (int eta = 0; eta < geomOH->get_etabins(); eta++)
-    {
-      for (int phi = 0; phi < geomOH->get_phibins(); phi++)
-      {
-        if (!ohcal_towers->getTower(eta, phi))
-        {
-          RawTower *new_tower = new RawTowerv1();
-          new_tower->set_energy(0);
-          ohcal_towers->AddTower(eta, phi, new_tower);
-        }
-      }
-    }
-
-    // update towers for background subtraction...
-    for (RawTowerContainer::ConstIterator rtiter = ohcal_towers->getTowers().first; rtiter != ohcal_towers->getTowers().second; ++rtiter)
-    {
-      RawTower *tower = rtiter->second;
-      float raw_energy = tower->get_energy();
-      float UE = towerbackground->get_UE(2).at(tower->get_bineta());
-      if (_use_flow_modulation)
-      {
-        float tower_phi = geomOH->get_tower_geometry(tower->get_key())->get_phi();
-        UE = UE * (1 + 2 * background_v2 * std::cos(2 * (tower_phi - background_Psi2)));
-      }
-      float new_energy = raw_energy - UE;
-      if (raw_energy == 0)
-      {
-        new_energy = 0;
-      }
-      tower->set_energy(new_energy);
     }
   }
 
@@ -445,6 +270,7 @@ int SubtractTowers::CreateNode(PHCompositeNode *topNode)
   if (m_use_towerinfo)
   {
     EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER_SUB1";
+    if(!m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC_SUB1";
     TowerInfoContainer *test_emcal_tower = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
     if (!test_emcal_tower)
     {
@@ -462,25 +288,7 @@ int SubtractTowers::CreateNode(PHCompositeNode *topNode)
       std::cout << "SubtractTowers::CreateNode : " << EMTowerName << " already exists! " << std::endl;
     }
   }
-  else
-  {
-    RawTowerContainer *test_emcal_tower = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_CEMC_RETOWER_SUB1");
-    if (!test_emcal_tower)
-    {
-      if (Verbosity() > 0)
-      {
-        std::cout << "SubtractTowers::CreateNode : creating TOWER_CALIB_CEMC_RETOWER_SUB1 node " << std::endl;
-      }
 
-      RawTowerContainer *emcal_towers = new RawTowerContainer(RawTowerDefs::CalorimeterId::HCALIN);
-      PHIODataNode<PHObject> *emcalTowerNode = new PHIODataNode<PHObject>(emcal_towers, "TOWER_CALIB_CEMC_RETOWER_SUB1", "PHObject");
-      emcalNode->addNode(emcalTowerNode);
-    }
-    else
-    {
-      std::cout << "SubtractTowers::CreateNode : TOWER_CALIB_CEMC_RETOWER_SUB1 already exists! " << std::endl;
-    }
-  }
 
   // store the new IHCal towers
   PHCompositeNode *ihcalNode = dynamic_cast<PHCompositeNode *>(iter.findFirst("PHCompositeNode", "HCALIN"));
@@ -506,25 +314,6 @@ int SubtractTowers::CreateNode(PHCompositeNode *topNode)
     else
     {
       std::cout << "SubtractTowers::CreateNode : " << IHTowerName << " already exists! " << std::endl;
-    }
-  }
-  else
-  {
-    RawTowerContainer *test_ihcal_tower = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALIN_SUB1");
-    if (!test_ihcal_tower)
-    {
-      if (Verbosity() > 0)
-      {
-        std::cout << "SubtractTowers::CreateNode : creating TOWER_CALIB_HCALIN_SUB1 node " << std::endl;
-      }
-
-      RawTowerContainer *ihcal_towers = new RawTowerContainer(RawTowerDefs::CalorimeterId::HCALIN);
-      PHIODataNode<PHObject> *ihcalTowerNode = new PHIODataNode<PHObject>(ihcal_towers, "TOWER_CALIB_HCALIN_SUB1", "PHObject");
-      ihcalNode->addNode(ihcalTowerNode);
-    }
-    else
-    {
-      std::cout << "SubtractTowers::CreateNode : TOWER_CALIB_HCALIN_SUB1 already exists! " << std::endl;
     }
   }
 
@@ -554,24 +343,6 @@ int SubtractTowers::CreateNode(PHCompositeNode *topNode)
       std::cout << "SubtractTowers::CreateNode : " << OHTowerName << " already exists! " << std::endl;
     }
   }
-  else
-  {
-    RawTowerContainer *test_ohcal_tower = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALOUT_SUB1");
-    if (!test_ohcal_tower)
-    {
-      if (Verbosity() > 0)
-      {
-        std::cout << "SubtractTowers::CreateNode : creating TOWER_CALIB_HCALOUT_SUB1 node " << std::endl;
-      }
 
-      RawTowerContainer *ohcal_towers = new RawTowerContainer(RawTowerDefs::CalorimeterId::HCALOUT);
-      PHIODataNode<PHObject> *ohcalTowerNode = new PHIODataNode<PHObject>(ohcal_towers, "TOWER_CALIB_HCALOUT_SUB1", "PHObject");
-      ohcalNode->addNode(ohcalTowerNode);
-    }
-    else
-    {
-      std::cout << "SubtractTowers::CreateNode : TOWER_CALIB_HCALOUT_SUB1 already exists! " << std::endl;
-    }
-  }
   return Fun4AllReturnCodes::EVENT_OK;
 }

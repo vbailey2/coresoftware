@@ -86,16 +86,13 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
   }
   
   // pull out the tower containers and geometry objects at the start
-  RawTowerContainer *towersEM3 = nullptr;
-  RawTowerContainer *towersIH3 = nullptr;
-  RawTowerContainer *towersOH3 = nullptr;
   TowerInfoContainer *towerinfosEM3 = nullptr;
   TowerInfoContainer *towerinfosIH3 = nullptr;
   TowerInfoContainer *towerinfosOH3 = nullptr;
   if (m_use_towerinfo)
   {
-    if(m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC";
-    else EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+    if(m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+    else EMTowerName = m_towerNodePrefix + "_CEMC";
     IHTowerName = m_towerNodePrefix + "_HCALIN";
     OHTowerName = m_towerNodePrefix + "_HCALOUT";
     towerinfosEM3 = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
@@ -212,11 +209,8 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
    // seed type 0 is D > 3 R=0.2 jets run on retowerized CEMC
   if (_seed_type == 0)
   {
-    JetContainer *reco2_jets;
-    if (m_use_towerinfo)
-    {
-      reco2_jets = findNode::getClass<JetContainer>(topNode, "AntiKt_TowerInfo_HIRecoSeedsRaw_r02");
-    }
+    JetContainer *reco2_jets = findNode::getClass<JetContainer>(topNode, "AntiKt_TowerInfo_HIRecoSeedsRaw_r02");
+    
     if (Verbosity() > 1)
     {
       std::cout << "DetermineTowerBackground::process_event: examining possible seeds (1st iteration) ... " << std::endl;
@@ -253,7 +247,6 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
         float comp_ET = 0;
         int comp_isBad = -99;
 
-        RawTower *tower;
         TowerInfo *towerinfo;
         RawTowerGeom *tower_geom;
 
@@ -287,7 +280,7 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
             unsigned int towerkey = towerinfosEM3->encode_key(comp.second);
             comp_ieta = towerinfosEM3->getTowerEtaBin(towerkey);
             comp_iphi = towerinfosEM3->getTowerPhiBin(towerkey);
-            const RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::HCALIN, comp_ieta, comp_iphi);
+            RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::HCALIN, comp_ieta, comp_iphi);
             tower_geom = geomIH->get_tower_geometry(key);
 	    if(!m_use_retower)
 	    {
