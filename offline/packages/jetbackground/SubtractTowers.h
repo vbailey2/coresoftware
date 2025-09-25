@@ -45,7 +45,11 @@ class SubtractTowers : public SubsysReco
     m_towerNodePrefix = prefix;
     return;
   }
-
+  void set_iteration(int iteration)
+  {
+    m_iteration = iteration;
+  }
+  
  private:
   int CreateNode(PHCompositeNode *topNode);
 
@@ -56,6 +60,7 @@ class SubtractTowers : public SubsysReco
   std::string EMTowerName;
   std::string IHTowerName;
   std::string OHTowerName;
+  int m_iteration{1};
 };
 
 #endif
