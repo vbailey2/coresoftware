@@ -79,11 +79,7 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
     std::cout << "DetermineTowerBackground::process_event: cannot use do_flow = " << _do_flow << " with nonretowered EMCAL" << std::endl;
     exit(-1);
   }
-  if( _seed_type == 0 && !m_use_retower)
-  {
-    std::cout << "DetermineTowerBackground::process_event: cannot use non-retowered EMCAL for first iteration" << std::endl;
-    exit(-1);
-  }
+
   
   // pull out the tower containers and geometry objects at the start
   TowerInfoContainer *towerinfosEM3 = nullptr;
@@ -282,12 +278,7 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
             comp_iphi = towerinfosEM3->getTowerPhiBin(towerkey);
             RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::HCALIN, comp_ieta, comp_iphi);
             tower_geom = geomIH->get_tower_geometry(key);
-	    if(!m_use_retower)
-	    {
-	      key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::CEMC, comp_ieta, comp_iphi);
-	      tower_geom = geomEM->get_tower_geometry(key);
-	    }
-            comp_ET = towerinfo->get_energy() / cosh(tower_geom->get_eta());
+	    comp_ET = towerinfo->get_energy() / cosh(tower_geom->get_eta());
             comp_isBad = !towerinfo->get_isGood();
           }
         }
@@ -306,7 +297,7 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
           std::cout << "DetermineTowerBackground::process_event: --> --> constituent in layer " << comp.first << " at ieta / iphi = " << comp_ieta << " / " << comp_iphi << ", filling map with key = " << comp_ikey << " and ET = " << comp_ET << std::endl;
         }
 
-        if(m_use_retower) constituent_ETsum[comp_ikey] += comp_ET;
+        constituent_ETsum[comp_ikey] += comp_ET;
 
         if (Verbosity() > 4)
         {

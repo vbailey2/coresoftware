@@ -372,6 +372,30 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
       return std::vector<Jet *>();
     }
   }
+  else if (m_input == Jet::CEMC_NORETOWER_TOWERINFO_SUB1)
+  {
+    m_use_towerinfo = true;
+    towerName = m_towerNodePrefix + "_CEMC_SUB1";
+    towerinfos = findNode::getClass<TowerInfoContainer>(topNode, towerName);
+    geocaloid = RawTowerDefs::CalorimeterId::CEMC;
+    geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
+    if ((!towerinfos) || !geom)
+    {
+      return std::vector<Jet *>();
+    }
+  }
+  else if (m_input == Jet::CEMC_NORETOWER_TOWERINFO_SUB2)
+  {
+    m_use_towerinfo = true;
+    towerName = m_towerNodePrefix + "_CEMC_SUB2";
+    towerinfos = findNode::getClass<TowerInfoContainer>(topNode, towerName);
+    geocaloid = RawTowerDefs::CalorimeterId::CEMC;
+    geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_CEMC");
+    if ((!towerinfos) || !geom)
+    {
+      return std::vector<Jet *>();
+    }
+  }
   else if (m_input == Jet::HCALIN_TOWER_SUB1)
   {
     towers = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALIN_SUB1");
@@ -393,6 +417,18 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
       return std::vector<Jet *>();
     }
   }
+  else if (m_input == Jet::HCALIN_TOWERINFO_SUB2)
+  {
+    m_use_towerinfo = true;
+    towerName = m_towerNodePrefix + "_HCALIN_SUB2";
+    towerinfos = findNode::getClass<TowerInfoContainer>(topNode, towerName);
+    geocaloid = RawTowerDefs::CalorimeterId::HCALIN;
+    geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALIN");
+    if ((!towerinfos) || !geom)
+    {
+      return std::vector<Jet *>();
+    }
+  }
   else if (m_input == Jet::HCALOUT_TOWER_SUB1)
   {
     towers = findNode::getClass<RawTowerContainer>(topNode, "TOWER_CALIB_HCALOUT_SUB1");
@@ -406,6 +442,18 @@ std::vector<Jet *> TowerJetInput::get_input(PHCompositeNode *topNode)
   {
     m_use_towerinfo = true;
     towerName = m_towerNodePrefix + "_HCALOUT_SUB1";
+    towerinfos = findNode::getClass<TowerInfoContainer>(topNode, towerName);
+    geocaloid = RawTowerDefs::CalorimeterId::HCALOUT;
+    geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALOUT");
+    if ((!towerinfos) || !geom)
+    {
+      return std::vector<Jet *>();
+    }
+  }
+  else if (m_input == Jet::HCALOUT_TOWERINFO_SUB2)
+  {
+    m_use_towerinfo = true;
+    towerName = m_towerNodePrefix + "_HCALOUT_SUB2";
     towerinfos = findNode::getClass<TowerInfoContainer>(topNode, towerName);
     geocaloid = RawTowerDefs::CalorimeterId::HCALOUT;
     geom = findNode::getClass<RawTowerGeomContainer>(topNode, "TOWERGEOM_HCALOUT");
