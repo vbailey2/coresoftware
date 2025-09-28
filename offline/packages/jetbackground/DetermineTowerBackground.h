@@ -112,6 +112,7 @@ class DetermineTowerBackground : public SubsysReco
   bool _reweight_failed{false};
 
   std::string m_towerNodePrefix{"TOWERINFO_CALIB"};
+  std::string EMRetowerName;
   std::string EMTowerName;
   std::string IHTowerName;
   std::string OHTowerName;

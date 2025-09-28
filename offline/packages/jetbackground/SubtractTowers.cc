@@ -120,6 +120,7 @@ int SubtractTowers::process_event(PHCompositeNode *topNode)
       int ieta = towerinfosEM3->getTowerEtaBin(towerkey);
       int iphi = towerinfosEM3->getTowerPhiBin(towerkey);
       float raw_energy = tower->get_energy();
+      std::cout<<"UE size is "<<towerbackground->get_UE(0).size()<<std::endl;
       float UE = towerbackground->get_UE(0).at(ieta);
       if (_use_flow_modulation)
       {
@@ -254,6 +255,9 @@ int SubtractTowers::CreateNode(PHCompositeNode *topNode)
 
   IHTowerName = m_towerNodePrefix + "_HCALIN";
   TowerInfoContainer *hcal_towers = findNode::getClass<TowerInfoContainer>(topNode, IHTowerName);
+  EMTowerName = m_towerNodePrefix + "_CEMC";
+  TowerInfoContainer *emcal_towers = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
+  
   if (m_use_towerinfo && !hcal_towers)
   {
     std::cout << PHWHERE << "Cannot find " << IHTowerName << " for creating new tower containers. Exiting" << std::endl;
@@ -269,8 +273,8 @@ int SubtractTowers::CreateNode(PHCompositeNode *topNode)
   }
   if (m_use_towerinfo)
   {
-    EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER_SUB" + std::to_string(m_iteration);
     if(!m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC_SUB" + std::to_string(m_iteration);
+    else EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER_SUB" + std::to_string(m_iteration);
     TowerInfoContainer *test_emcal_tower = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
     if (!test_emcal_tower)
     {
@@ -279,8 +283,10 @@ int SubtractTowers::CreateNode(PHCompositeNode *topNode)
         std::cout << "SubtractTowers::CreateNode : creating " << EMTowerName << " node " << std::endl;
       }
 
-      TowerInfoContainer *emcal_towers = dynamic_cast<TowerInfoContainer *>(hcal_towers->CloneMe());
-      PHIODataNode<PHObject> *emcalTowerNode = new PHIODataNode<PHObject>(emcal_towers, EMTowerName, "PHObject");
+      TowerInfoContainer *emcal_towers_new;
+      if(m_use_retower) emcal_towers_new = dynamic_cast<TowerInfoContainer *>(hcal_towers->CloneMe());
+      else emcal_towers_new = dynamic_cast<TowerInfoContainer *>(emcal_towers->CloneMe());
+      PHIODataNode<PHObject> *emcalTowerNode = new PHIODataNode<PHObject>(emcal_towers_new, EMTowerName, "PHObject");
       emcalNode->addNode(emcalTowerNode);
     }
     else

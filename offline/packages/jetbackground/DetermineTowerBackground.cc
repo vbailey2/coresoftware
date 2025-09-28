@@ -85,18 +85,26 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
   TowerInfoContainer *towerinfosEM3 = nullptr;
   TowerInfoContainer *towerinfosIH3 = nullptr;
   TowerInfoContainer *towerinfosOH3 = nullptr;
+  TowerInfoContainer *towerinfosREM3 = nullptr;
   if (m_use_towerinfo)
   {
     if(m_use_retower) EMTowerName = m_towerNodePrefix + "_CEMC_RETOWER";
     else EMTowerName = m_towerNodePrefix + "_CEMC";
     IHTowerName = m_towerNodePrefix + "_HCALIN";
     OHTowerName = m_towerNodePrefix + "_HCALOUT";
+    EMRetowerName = m_towerNodePrefix + "_CEMC_RETOWER";
+    towerinfosREM3 = findNode::getClass<TowerInfoContainer>(topNode, EMRetowerName);
     towerinfosEM3 = findNode::getClass<TowerInfoContainer>(topNode, EMTowerName);
     towerinfosIH3 = findNode::getClass<TowerInfoContainer>(topNode, IHTowerName);
     towerinfosOH3 = findNode::getClass<TowerInfoContainer>(topNode, OHTowerName);
     if (!towerinfosEM3)
     {
       std::cout << "DetermineTowerBackground::process_event: Cannot find node " << EMTowerName << std::endl;
+      exit(1);
+    }
+    if (!towerinfosREM3)
+    {
+      std::cout << "DetermineTowerBackground::process_event: Cannot find node " << EMRetowerName << std::endl;
       exit(1);
     }
     if (!towerinfosIH3)
@@ -145,13 +153,13 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
     _EMCAL_NPHI = geomEM->get_phibins();
     
     // resize UE density and energy vectors
-    _UE.resize(3 , std::vector<float>(_HCAL_NETA, 0));
+    if(m_use_retower) _UE.resize(3 , std::vector<float>(_HCAL_NETA, 0));
     
-    _EMCAL_E.resize(_HCAL_NETA, std::vector<float>(_HCAL_NPHI, 0));
+    if(m_use_retower) _EMCAL_E.resize(_HCAL_NETA, std::vector<float>(_HCAL_NPHI, 0));
     _IHCAL_E.resize(_HCAL_NETA, std::vector<float>(_HCAL_NPHI, 0));
     _OHCAL_E.resize(_HCAL_NETA, std::vector<float>(_HCAL_NPHI, 0));
     
-    _EMCAL_ISBAD.resize(_HCAL_NETA, std::vector<int>(_HCAL_NPHI, 0));
+    if(m_use_retower) _EMCAL_ISBAD.resize(_HCAL_NETA, std::vector<int>(_HCAL_NPHI, 0));
     _IHCAL_ISBAD.resize(_HCAL_NETA, std::vector<int>(_HCAL_NPHI, 0));
     _OHCAL_ISBAD.resize(_HCAL_NETA, std::vector<int>(_HCAL_NPHI, 0));
 
@@ -162,7 +170,7 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
     _FULLCALOFLOW_PHI_VAL.resize(_HCAL_NPHI, 0);
 
     // defualt set weights to 1.0 for all phi bins
-    _EMCAL_PHI_WEIGHTS.resize(_HCAL_NPHI, 1.0);
+    if(m_use_retower) _EMCAL_PHI_WEIGHTS.resize(_HCAL_NPHI, 1.0);
     _IHCAL_PHI_WEIGHTS.resize(_HCAL_NPHI, 1.0);
     _OHCAL_PHI_WEIGHTS.resize(_HCAL_NPHI, 1.0);
 
@@ -172,6 +180,8 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
       _EMCAL_E.resize(_EMCAL_NETA, std::vector<float>(_EMCAL_NPHI, 0));
       _EMCAL_ISBAD.resize(_EMCAL_NETA, std::vector<int>(_EMCAL_NPHI, 0));
       _EMCAL_PHI_WEIGHTS.resize(_EMCAL_NPHI, 1.0);
+
+      std::cout << "DetermineTowerBackground::process_event: setting number of towers in eta / phi: " << _EMCAL_NETA << " / " << _EMCAL_NPHI << std::endl;
     }
     if (Verbosity() > 0)
     {
@@ -272,10 +282,10 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
           }
           else if (comp.first == 13 || comp.first == 28)
           {
-            towerinfo = towerinfosEM3->get_tower_at_channel(comp.second);
-            unsigned int towerkey = towerinfosEM3->encode_key(comp.second);
-            comp_ieta = towerinfosEM3->getTowerEtaBin(towerkey);
-            comp_iphi = towerinfosEM3->getTowerPhiBin(towerkey);
+            towerinfo = towerinfosREM3->get_tower_at_channel(comp.second);
+            unsigned int towerkey = towerinfosREM3->encode_key(comp.second);
+            comp_ieta = towerinfosREM3->getTowerEtaBin(towerkey);
+            comp_iphi = towerinfosREM3->getTowerPhiBin(towerkey);
             RawTowerDefs::keytype key = RawTowerDefs::encode_towerid(RawTowerDefs::CalorimeterId::HCALIN, comp_ieta, comp_iphi);
             tower_geom = geomIH->get_tower_geometry(key);
 	    comp_ET = towerinfo->get_energy() / cosh(tower_geom->get_eta());
@@ -963,12 +973,18 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
 
       for (int phi = 0; phi < local_max_phi; phi++)
       {
-        float this_eta = geomIH->get_etacenter(eta);
-        float this_phi = geomIH->get_phicenter(phi);
+        float this_eta;
+        float this_phi;
+	
 	if(!m_use_retower && layer == 0)
 	{
 	  this_eta = geomEM->get_etacenter(eta);
 	  this_phi = geomEM->get_phicenter(phi);
+	}
+	else
+	{
+	  this_eta = geomIH->get_etacenter(eta);
+	  this_phi = geomIH->get_phicenter(phi);
 	}
 	  
         bool isExcluded = false;
@@ -1048,13 +1064,18 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
         }
       }
 
-      std::pair<float, float> etabounds = geomIH->get_etabounds(eta);
-      std::pair<float, float> phibounds = geomIH->get_phibounds(0);
+      std::pair<float, float> etabounds;
+      std::pair<float, float> phibounds;
 
       if(!m_use_retower && layer == 0)
       {
 	etabounds = geomEM->get_etabounds(eta);
 	phibounds = geomEM->get_phibounds(0);
+      }
+      else
+      {
+	etabounds = geomIH->get_etabounds(eta);
+	phibounds = geomIH->get_phibounds(0);
       }
       
       float deta = etabounds.second - etabounds.first;
@@ -1087,7 +1108,9 @@ int DetermineTowerBackground::process_event(PHCompositeNode *topNode)
     for (int layer = 0; layer < 3; layer++)
     {
       std::cout << "DetermineTowerBackground::process_event: summary UE in layer " << layer << " : ";
-      for (int eta = 0; eta < _HCAL_NETA; eta++)
+      int neta = _HCAL_NETA;
+      if(layer == 0 && !m_use_retower) neta = _EMCAL_NETA;
+      for (int eta = 0; eta < neta; eta++)
       {
         std::cout << _UE[layer].at(eta) << " , ";
       }
