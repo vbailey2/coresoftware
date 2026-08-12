@@ -62,9 +62,13 @@ int TriggeredTrackSkimmer::process_event([[maybe_unused]] PHCompositeNode *topNo
   }
 
   //get output track and seed containers
-  SvtxTrackMap *skimmedtracks = findNode::getClass<SvtxTrackMap>(topNode, m_outputtrackNode);
-  TrackSeedContainer *skimmedsseeds = findNode::getClass<TrackSeedContainer>(topNode, m_outputsseedNode);
-  TrackSeedContainer *skimmedtseeds = findNode::getClass<TrackSeedContainer>(topNode, m_outputtseedNode);
+  SvtxTrackMap *triggertracks = findNode::getClass<SvtxTrackMap>(topNode, m_triggertrackNode);
+  TrackSeedContainer *triggersseeds = findNode::getClass<TrackSeedContainer>(topNode, m_triggersseedNode);
+  TrackSeedContainer *triggertseeds = findNode::getClass<TrackSeedContainer>(topNode, m_triggertseedNode);
+
+  SvtxTrackMap *streamtracks = findNode::getClass<SvtxTrackMap>(topNode, m_streamtrackNode);
+  TrackSeedContainer *streamsseeds = findNode::getClass<TrackSeedContainer>(topNode, m_streamsseedNode);
+  TrackSeedContainer *streamtseeds = findNode::getClass<TrackSeedContainer>(topNode, m_streamtseedNode);
   
   m_siliconSeedMap = findNode::getClass<TrackSeedContainer>(topNode, m_siliconSeedMapName);
   if (!m_siliconSeedMap)
@@ -83,23 +87,39 @@ int TriggeredTrackSkimmer::process_event([[maybe_unused]] PHCompositeNode *topNo
 
   for (const auto &[trackKey, track] : *m_trackMap)
   {
-   m_trackCrossing = track->get_crossing();
-   if(m_trackCrossing == 0)
+   int trackCrossing = track->get_crossing();
+   if(trackCrossing == 0)
    {
-     skimmedtracks->insert(track);
+     triggertracks->insert(track);
 
      TrackSeed *sseed = track->get_silicon_seed();
      if(sseed)
      {
-       skimmedsseeds->insert(sseed);
+       triggersseeds->insert(sseed);
      }
 
      TrackSeed *tseed = track->get_tpc_seed();
      if(tseed)
      {
-       skimmedtseeds->insert(tseed);
+       triggertseeds->insert(tseed);
      }
                
+   }
+   else
+   {
+     streamtracks->insert(track);
+
+     TrackSeed *sseed = track->get_silicon_seed();
+     if(sseed)
+     {
+       streamsseeds->insert(sseed);
+     }
+
+     TrackSeed *tseed = track->get_tpc_seed();
+     if(tseed)
+     {
+       streamtseeds->insert(tseed);
+     }
    }
   }
 
@@ -110,7 +130,8 @@ int TriggeredTrackSkimmer::process_event([[maybe_unused]] PHCompositeNode *topNo
     std::cerr << Name() << ": required node is missing:\n"
               << "  " << m_vertexMapName << std::endl;
   }
-  SvtxVertexMap *skimmedvertex = findNode::getClass<SvtxVertexMap>(topNode, m_outputvertexNode);
+  SvtxVertexMap *triggervertex = findNode::getClass<SvtxVertexMap>(topNode, m_triggervertexNode);
+  SvtxVertexMap *streamvertex = findNode::getClass<SvtxVertexMap>(topNode, m_streamvertexNode);
 
   for (const auto &[vertexKey, vertex] : *m_vertexMap)
   {
@@ -118,7 +139,11 @@ int TriggeredTrackSkimmer::process_event([[maybe_unused]] PHCompositeNode *topNo
     int vertexCrossing = vertex->get_beam_crossing();
     if(vertexCrossing == 0)
     {
-      skimmedvertex->insert_clone(vertex);
+      triggervertex->insert_clone(vertex);
+    }
+    else
+    {
+      streamvertex->insert_clone(vertex);
     }
   }
    
@@ -178,75 +203,78 @@ int TriggeredTrackSkimmer::CreateNode(PHCompositeNode *topNode)
 
 
   // Create skimmed nodes 
-  SvtxTrackMap *test_tracks = findNode::getClass<SvtxTrackMap>(topNode, m_outputtrackNode);
-  if (!test_tracks)
-  {
-    SvtxTrackMap *skimmedtracks = new SvtxTrackMap_v2();
-    PHIODataNode<PHObject> *skimmedtracknode;
-    if (Verbosity() > 0)
-    {
-      std::cout << "TriggeredTrackSkimmer::CreateNode : creating " << m_outputtrackNode << std::endl;
-    }
-    skimmedtracknode = new PHIODataNode<PHObject>(skimmedtracks, m_outputtrackNode, "PHObject");
-    svtxnode->addNode(skimmedtracknode);
-  }
-  else
-  {
-    std::cout << "TriggeredTrackSkimmer::CreateNode : " << m_outputtrackNode << " already exists! " << std::endl;
-  }
+  CreateTrackNode(topNode, svtxnode, m_triggertrackNode);
+  CreateSeedNode(topNode, svtxnode, m_triggersseedNode);
+  CreateSeedNode(topNode, svtxnode, m_triggertseedNode);
+  CreateVertexNode(topNode, svtxnode, m_triggervertexNode);
 
-  TrackSeedContainer *test_sseeds = findNode::getClass<TrackSeedContainer>(topNode, m_outputsseedNode);
-  if (!test_sseeds)
-  {
-    TrackSeedContainer *skimmedsseeds = new TrackSeedContainer_v1();
-    PHIODataNode<PHObject> *skimmedsseednode;
-    if (Verbosity() > 0)
-    {
-      std::cout << "TriggeredTrackSkimmer::CreateNode : creating " << m_outputsseedNode << std::endl;
-    }
-    skimmedsseednode = new PHIODataNode<PHObject>(skimmedsseeds, m_outputsseedNode, "PHObject");
-    svtxnode->addNode(skimmedsseednode);
-  }
-  else
-  {
-    std::cout << "TriggeredTrackSkimmer::CreateNode : " << m_outputsseedNode << " already exists! " << std::endl;
-  }
-
-  TrackSeedContainer *test_tseeds = findNode::getClass<TrackSeedContainer>(topNode, m_outputtseedNode);
-  if (!test_tseeds)
-  {
-    TrackSeedContainer *skimmedtseeds = new TrackSeedContainer_v1();
-    PHIODataNode<PHObject> *skimmedtseednode;
-    if (Verbosity() > 0)
-    {
-      std::cout << "TriggeredTrackSkimmer::CreateNode : creating " << m_outputtseedNode << std::endl;
-    }
-    skimmedtseednode = new PHIODataNode<PHObject>(skimmedtseeds, m_outputtseedNode, "PHObject");
-    svtxnode->addNode(skimmedtseednode);
-  }
-  else
-  {
-    std::cout << "TriggeredTrackSkimmer::CreateNode : " << m_outputtseedNode << " already exists! " << std::endl;
-  }
-  
-  SvtxVertexMap *test_vertex = findNode::getClass<SvtxVertexMap>(topNode, m_outputvertexNode);
-  if (!test_vertex)
-  {
-    SvtxVertexMap *skimmedvertex = new SvtxVertexMap_v1();
-    PHIODataNode<PHObject> *skimmedvertexnode;
-    if (Verbosity() > 0)
-    {
-      std::cout << "TriggeredVertexSkimmer::CreateNode : creating " << m_outputvertexNode << std::endl;
-    }
-    skimmedvertexnode = new PHIODataNode<PHObject>(skimmedvertex, m_outputvertexNode, "PHObject");
-    svtxnode->addNode(skimmedvertexnode);
-  }
-  else
-  {
-    std::cout << "TriggeredVertexSkimmer::CreateNode : " << m_outputvertexNode << " already exists! " << std::endl;
-  }
+  CreateTrackNode(topNode, svtxnode, m_streamtrackNode);
+  CreateSeedNode(topNode, svtxnode, m_streamsseedNode);
+  CreateSeedNode(topNode, svtxnode, m_streamtseedNode);
+  CreateVertexNode(topNode, svtxnode, m_streamvertexNode);
   
   return Fun4AllReturnCodes::EVENT_OK;
+}
+
+int TriggeredTrackSkimmer::CreateSeedNode(PHCompositeNode *topNode, PHCompositeNode *svtxnode, std::string nodename = "")
+{
+  TrackSeedContainer *test_sseeds = findNode::getClass<TrackSeedContainer>(topNode, nodename);
+  if (!test_sseeds)
+  {
+    TrackSeedContainer *triggersseeds = new TrackSeedContainer_v1();
+    PHIODataNode<PHObject> *triggersseednode;
+    if (Verbosity() > 0)
+    {
+      std::cout << "TriggeredTrackSkimmer::CreateNode : creating " << nodename << std::endl;
+    }
+    triggersseednode = new PHIODataNode<PHObject>(triggersseeds, nodename, "PHObject");
+    svtxnode->addNode(triggersseednode);
   }
+  else
+  {
+    std::cout << "TriggeredTrackSkimmer::CreateNode : " << nodename << " already exists! " << std::endl;
+  }
+  return Fun4AllReturnCodes::EVENT_OK;
+}
 
+int TriggeredTrackSkimmer::CreateTrackNode(PHCompositeNode *topNode, PHCompositeNode *svtxnode, std::string nodename = "")
+{
+  SvtxTrackMap *test_tracks = findNode::getClass<SvtxTrackMap>(topNode, nodename);
+  if (!test_tracks)
+  {
+    SvtxTrackMap *triggertracks = new SvtxTrackMap_v2();
+    PHIODataNode<PHObject> *triggertracknode;
+    if (Verbosity() > 0)
+    {
+      std::cout << "TriggeredTrackSkimmer::CreateNode : creating " << nodename << std::endl;
+    }
+    triggertracknode = new PHIODataNode<PHObject>(triggertracks, nodename, "PHObject");
+    svtxnode->addNode(triggertracknode);
+  }
+  else
+  {
+    std::cout << "TriggeredTrackSkimmer::CreateNode : " << nodename << " already exists! " << std::endl;
+  }
+  return Fun4AllReturnCodes::EVENT_OK;
+}
 
+int TriggeredTrackSkimmer::CreateVertexNode(PHCompositeNode *topNode, PHCompositeNode *svtxnode, std::string nodename = "")
+{
+ SvtxVertexMap *test_vertex = findNode::getClass<SvtxVertexMap>(topNode, nodename);
+  if (!test_vertex)
+  {
+    SvtxVertexMap *triggervertex = new SvtxVertexMap_v1();
+    PHIODataNode<PHObject> *triggervertexnode;
+    if (Verbosity() > 0)
+    {
+      std::cout << "TriggeredVertexSkimmer::CreateNode : creating " << nodename << std::endl;
+    }
+    triggervertexnode = new PHIODataNode<PHObject>(triggervertex, nodename, "PHObject");
+    svtxnode->addNode(triggervertexnode);
+  }
+  else
+  {
+    std::cout << "TriggeredVertexSkimmer::CreateNode : " << nodename << " already exists! " << std::endl;
+  }
+  return Fun4AllReturnCodes::EVENT_OK;
+}

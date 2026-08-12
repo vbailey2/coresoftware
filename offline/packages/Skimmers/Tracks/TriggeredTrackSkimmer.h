@@ -56,29 +56,35 @@ class TriggeredTrackSkimmer : public SubsysReco
   void Print(const std::string &what = "ALL") const override;
 
   int CreateNode(PHCompositeNode *topNode);
+  int CreateTrackNode(PHCompositeNode *topNode, PHCompositeNode *svtxNode, std::string nodename);
+  int CreateSeedNode(PHCompositeNode *topNode, PHCompositeNode *svtxNode, std::string nodename);
+  int CreateVertexNode(PHCompositeNode *topNode, PHCompositeNode *svtxNode, std::string nodename);
   
  private:
   SvtxTrackMap *m_trackMap = nullptr;
   std::string m_trackMapName = "SvtxTrackMap";
-  int m_trackCrossing = 0;
-  std::string m_outputtrackNode = "TriggerSvtxTrackMap";
+  std::string m_triggertrackNode = "TriggerSvtxTrackMap";
+  std::string m_streamtrackNode = "StreamSvtxTrackMap";
 
   TrackSeedContainer *m_siliconSeedMap = nullptr;
   std::string m_siliconSeedMapName = "SiliconTrackSeedContainer";
-  std::string m_outputsseedNode = "TriggerSiliconTrackSeedContainer";
+  std::string m_triggersseedNode = "TriggerSiliconTrackSeedContainer";
+  std::string m_streamsseedNode = "StreamSiliconTrackSeedContainer";
   
   TrackSeedContainer *m_TPCSeedMap = nullptr;
   std::string m_TPCSeedMapName = "TpcTrackSeedContainer";
-  std::string m_outputtseedNode = "TriggerTpcTrackSeedContainer";
+  std::string m_triggertseedNode = "TriggerTpcTrackSeedContainer";
+  std::string m_streamtseedNode = "StreamTpcTrackSeedContainer";
   
   TrackSeedContainer *m_svtxSeedMap = nullptr;
   std::string m_svtxSeedMapName = "SvtxTrackSeedContainer";
-  std::string m_outputseedNode = "TriggerSvtxTrackSeedContainer";
+  std::string m_triggerseedNode = "TriggerSvtxTrackSeedContainer";
+  std::string m_streamseedNode = "StreamSvtxTrackSeedContainer";
   
   SvtxVertexMap *m_vertexMap = nullptr;
   std::string m_vertexMapName = "SvtxVertexMap";
-  int m_vertexCrossing = 0;
-  std::string m_outputvertexNode = "TriggerSvtxVertexMap";
+  std::string m_triggervertexNode = "TriggerSvtxVertexMap";
+  std::string m_streamvertexNode = "StreamSvtxVertexMap";
 
 };
 
