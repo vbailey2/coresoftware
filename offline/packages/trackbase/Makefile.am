@@ -38,9 +38,7 @@ AM_LDFLAGS = \
 
 
 pkginclude_HEADERS = \
-  ActsAborter.h \
   ActsGeometry.h \
-  ActsGsfTrackFittingAlgorithm.h \
   ActsSourceLink.h \
   ActsSurfaceMaps.h \
   ActsTrackFittingAlgorithm.h \
@@ -71,8 +69,9 @@ pkginclude_HEADERS = \
   LaserClusterContainerv1.h \
   LaserClusterv1.h \
   LaserClusterv2.h \
-  MagneticFieldOptions.h \
+  LaserClusterv3.h \
   MaterialWiper.h \
+  MagneticFieldOptions.h \
   MvtxDefs.h \
   MvtxEventInfo.h \
   MvtxEventInfov1.h \
@@ -116,6 +115,7 @@ pkginclude_HEADERS = \
   TrkrClusterv3.h \
   TrkrClusterv4.h \
   TrkrClusterv5.h \
+  TrkrClusterv6.h \
   TrkrDefs.h \
   TrkrHit.h \
   TrkrHitSet.h \
@@ -130,7 +130,8 @@ pkginclude_HEADERS = \
   TrkrHitTruthAssoc.h \
   TrkrHitTruthAssocv1.h \
   TrkrHitv1.h \
-  TrkrHitv2.h
+  TrkrHitv2.h \
+  TrkrHitv3.h
 
 ROOTDICTS = \
   CMFlashClusterContainer_Dict.cc \
@@ -152,6 +153,7 @@ ROOTDICTS = \
   LaserCluster_Dict.cc \
   LaserClusterv1_Dict.cc \
   LaserClusterv2_Dict.cc \
+  LaserClusterv3_Dict.cc \
   MvtxEventInfo_Dict.cc \
   MvtxEventInfov1_Dict.cc \
   MvtxEventInfov2_Dict.cc \
@@ -188,6 +190,7 @@ ROOTDICTS = \
   TrkrClusterv3_Dict.cc \
   TrkrClusterv4_Dict.cc \
   TrkrClusterv5_Dict.cc \
+  TrkrClusterv6_Dict.cc \
   TrkrHitSetContMvtxHelper_Dict.cc \
   TrkrHitSetContMvtxHelperv1_Dict.cc \
   TrkrHitSetContainer_Dict.cc \
@@ -201,7 +204,8 @@ ROOTDICTS = \
   TrkrHitTruthAssocv1_Dict.cc \
   TrkrHit_Dict.cc \
   TrkrHitv1_Dict.cc \
-  TrkrHitv2_Dict.cc
+  TrkrHitv2_Dict.cc \
+  TrkrHitv3_Dict.cc
 
 
 pcmdir = $(libdir)
@@ -219,7 +223,6 @@ libtrack_la_SOURCES = \
   MagneticFieldOptions.cc \
   sPHENIXActsDetectorElement.cc \
   TGeoDetectorWithOptions.cc \
-  TrackFittingAlgorithmFunctionsGsf.cc \
   TrackFittingAlgorithmFunctionsKalman.cc \
   TrackFitUtils.cc
 
@@ -240,6 +243,7 @@ libtrack_io_la_SOURCES = \
   LaserClusterContainerv1.cc \
   LaserClusterv1.cc \
   LaserClusterv2.cc \
+  LaserClusterv3.cc \
   MvtxDefs.cc \
   MvtxEventInfo.cc \
   MvtxEventInfov1.cc \
@@ -275,6 +279,7 @@ libtrack_io_la_SOURCES = \
   TrkrClusterv3.cc \
   TrkrClusterv4.cc \
   TrkrClusterv5.cc \
+  TrkrClusterv6.cc \
   TrkrDefs.cc \
   TrkrHitSet.cc \
   TrkrHitSetContMvtxHelper.cc \
@@ -287,15 +292,16 @@ libtrack_io_la_SOURCES = \
   TrkrHitSetTpcv1.cc \
   TrkrHitTruthAssocv1.cc \
   TrkrHitv1.cc \
-  TrkrHitv2.cc
+  TrkrHitv2.cc \
+  TrkrHitv3.cc
 
 libtrack_la_LIBADD = \
   libtrack_io.la \
   -lActsCore \
-  -lActsExamplesMagneticField \
-  -lActsPluginTGeo \
+  -lActsPluginRoot \
   -lActsExamplesDetectorTGeo \
   -lffamodules \
+  -lg4detectors \
   -lboost_program_options
 
 libtrack_io_la_LIBADD = \

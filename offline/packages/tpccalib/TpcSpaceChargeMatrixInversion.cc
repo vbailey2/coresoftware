@@ -165,6 +165,14 @@ bool TpcSpaceChargeMatrixInversion::add_from_file(const std::string& shortfilena
     return false;
   }
 
+  if( Verbosity() ) {
+    std::cout << "TpcSpaceChargeMatrixInversion::add_from_file -"
+      << " file: " << filename
+      << " objectname: " << objectname
+      << " entries: " << source->get_entries()
+      << std::endl;
+  }
+
   // add object
   return add(*source);
 }
@@ -199,6 +207,8 @@ void TpcSpaceChargeMatrixInversion::calculate_distortion_corrections(const Inver
     std::cout << "TpcSpaceChargeMatrixInversion::calculate_distortion_corrections - no distortion matrices loaded. Aborting" << std::endl;
     exit(1);
   }
+
+  std::cout << "TpcSpaceChargeMatrixInversion::calculate_distortion_corrections - entries: " <<  m_matrix_container->get_entries() << std::endl;
 
   // get grid dimensions from matrix container
   int phibins = 0;
@@ -457,22 +467,6 @@ void TpcSpaceChargeMatrixInversion::save_distortion_corrections(const std::strin
     return;
   }
 
-  // save everything to root file
-  std::cout << "TpcSpaceChargeMatrixInversion::save_distortions - writing histograms to " << filename << std::endl;
-  std::unique_ptr<TFile> outputfile(TFile::Open(filename.c_str(), "RECREATE"));
-  outputfile->cd();
+  m_dcc_average->save_histograms(filename);
 
-  for (const auto& h_list : {m_dcc_average->m_hentries, m_dcc_average->m_hDRint, m_dcc_average->m_hDPint, m_dcc_average->m_hDZint})
-  {
-    for (const auto& h : h_list)
-    {
-      if (h)
-      {
-        h->Write(h->GetName());
-      }
-    }
-  }
-
-  // close TFile
-  outputfile->Close();
 }

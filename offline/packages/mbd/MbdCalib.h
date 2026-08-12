@@ -12,12 +12,14 @@
 
 #include <array>
 #include <vector>
+#include <map>
 #include <string>
 #include <string_view>
 #include <memory>
 
 class TTree;
 class TGraph;
+class TNamed;
 class CDBInterface;
 
 class MbdCalib 
@@ -69,6 +71,7 @@ class MbdCalib
     return std::numeric_limits<float>::quiet_NaN();
   }
 
+  void get_tcorr_range(const int ifeech, int& min, int& max, int& step);
 
   float get_tcorr(const int ifeech, const int tdc) const {
     if (tdc<0)
@@ -158,7 +161,7 @@ class MbdCalib
   int Write_CDB_Gains(const std::string& dbfile);
   int Write_CDB_Pileup(const std::string& dbfile);
   int Write_CDB_Thresholds(const std::string& dbfile);
-  static int Write_CDB_All();
+  int Write_CDB_All();
 #endif
 
   int Write_SampMax(const std::string& dbfile);
@@ -168,9 +171,11 @@ class MbdCalib
   int Write_T0Corr(const std::string& dbfile);
   int Write_Ped(const std::string& dbfile);
   int Write_TimeCorr(const std::string& dbfile);
+  int Write_SlewCorr(const std::string& dbfile);
   int Write_Gains(const std::string& dbfile);
   int Write_Pileup(const std::string& dbfile);
   int Write_Thresholds(const std::string& dbfile);
+  int Write_All();
 
   void Reset_TQT0();
   void Reset_TTT0();
@@ -185,6 +190,10 @@ class MbdCalib
 
   // void Dump_to_file(const std::string& what = "ALL");
 
+#ifndef ONLINE
+  void Save_CDB_URL();
+#endif
+
   void SetRawDstFlag(const int r) { _rawdstflag = r; }
   void SetFitsOnly(const int f) { _fitsonly = f; }
 
@@ -198,6 +207,7 @@ class MbdCalib
 #ifndef ONLINE
   CDBInterface* _cdb{nullptr};
   recoConsts* _rc{nullptr};
+  std::map<std::string, std::string> _cdb_urls;
 #endif
 
   std::unique_ptr<MbdGeom> _mbdgeom{nullptr};

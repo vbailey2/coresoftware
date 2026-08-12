@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <format>
@@ -156,7 +157,7 @@ int MbdEvent::InitRun()
   {
     // Download calibrations
     int status = _mbdcal->Download_All();
-    if ( status < 0 && _calpass==0 )  // only abort for normal processing
+    if ( status < 0 && _calpass==0 && _fitsonly )  // only abort for production waveform pass
     {
       return Fun4AllReturnCodes::ABORTRUN;
     }
@@ -165,18 +166,32 @@ int MbdEvent::InitRun()
     if ( _calpass>1 )
     {
       std::string calfname = "results/"; calfname += std::to_string(_runnum); calfname += "/mbd_sampmax.calib";
-      std::cout << "Loading local sampmax, " << calfname << std::endl;
-      _mbdcal->Download_SampMax( calfname );
+      if ( std::filesystem::exists(calfname) )
+      {
+        std::cout << "Loading local sampmax, " << calfname << std::endl;
+        _mbdcal->Download_SampMax( calfname );
+      }
+      else
+      {
+        std::cout << PHWHERE << "local sampmax not found, skipping: " << calfname << std::endl;
+      }
 
       calfname = "results/"; calfname += std::to_string(_runnum); calfname += "/mbd_ped.calib";
-      std::cout << "Loading local ped, " << calfname << std::endl;
-      _mbdcal->Download_Ped( calfname );
+      if ( std::filesystem::exists(calfname) )
+      {
+        std::cout << "Loading local ped, " << calfname << std::endl;
+        _mbdcal->Download_Ped( calfname );
+      }
+      else
+      {
+        std::cout << PHWHERE << "local ped not found, skipping: " << calfname << std::endl;
+      }
     }
 
     // check if sampmax and ped calibs exist
     int scheck = _mbdcal->get_sampmax(0);
 
-    if ( (scheck<0 || _is_online) && _calpass!=1 )
+    if ( (scheck<0 || _is_online) && _calpass==0 )
     {
       _no_sampmax = 1000;    // num events for on the fly calculation
       _calib_done = 0;
@@ -281,11 +296,46 @@ int MbdEvent::InitRun()
 
   if ( _calpass == 2 )
   {
-    // zero out the tt_t0, tq_t0, and gains to produce uncalibrated time and charge
     std::cout << "MBD Cal Pass 2" << std::endl;
-    _mbdcal->Reset_TTT0();
-    _mbdcal->Reset_TQT0();
-    _mbdcal->Reset_Gains();
+
+    // zero out the tt_t0, tq_t0, and gains to produce uncalibrated time and charge
+    // or load pass2 calibs from local file for calpass2+, if local files exist
+    std::string calfname = "results/"; calfname += std::to_string(_runnum); calfname += "/mbd_tt_t0.calib";
+    if ( std::filesystem::exists(calfname) )
+    {
+      std::cout << "Loading local mbd_tt_t0, " << calfname << std::endl;
+      _mbdcal->Download_TTT0( calfname );
+    }
+    else
+    {
+      _mbdcal->Reset_TTT0();
+      std::cout << PHWHERE << "local mbd_tt_t0 not found, reset to 0: " << calfname << std::endl;
+    }
+
+    calfname = "results/"; calfname += std::to_string(_runnum); calfname += "/mbd_tq_t0.calib";
+    if ( std::filesystem::exists(calfname) )
+    {
+      std::cout << "Loading local mbd_tq_t0, " << calfname << std::endl;
+      _mbdcal->Download_TQT0( calfname );
+    }
+    else
+    {
+      _mbdcal->Reset_TQT0();
+      std::cout << PHWHERE << "local mbd_tq_t0 not found, reset to 0: " << calfname << std::endl;
+    }
+
+    calfname = "results/"; calfname += std::to_string(_runnum); calfname += "/mbd_qfit.calib";
+    if ( std::filesystem::exists(calfname) )
+    {
+      std::cout << "Loading local mbd_qfit, " << calfname << std::endl;
+      _mbdcal->Download_Gains( calfname );
+    }
+    else
+    {
+      _mbdcal->Reset_Gains();
+      std::cout << PHWHERE << "local mbd_gains not found, reset to 1: " << calfname << std::endl;
+    }
+
 
     TDirectory *orig_dir = gDirectory;
 
@@ -444,13 +494,18 @@ int MbdEvent::SetRawData(std::array< CaloPacket *,2> &dstp, MbdRawContainer *bbc
     return Fun4AllReturnCodes::DISCARDEVENT;
   }
 
+  int evtseq = 0;
+  if ( gl1raw != nullptr )
+  {
+    evtseq = gl1raw->getEvtSequence();
+  }
+
   // Only use MBDNS triggered events for MBD calibrations
   if ( _calpass>0 && gl1raw != nullptr )
   {
     const uint64_t MBDTRIGS = 0x7c00;  // MBDNS trigger bits
     //uint64_t trigvec = gl1raw->getTriggerVector();  // raw trigger only (obsolete, was only available in run1)
     uint64_t strig = gl1raw->getScaledVector();  // scaled trigger only
-    int evtseq = gl1raw->getEvtSequence();
     if ( Verbosity() )
     {
       static int counter = 0;
@@ -528,6 +583,7 @@ int MbdEvent::SetRawData(std::array< CaloPacket *,2> &dstp, MbdRawContainer *bbc
         if ( _nsamples > 0 && _nsamples <= 30 )
         {
           _mbdsig[feech].SetXY(m_samp[feech], m_adc[feech]);
+          _mbdsig[feech].SetEvtNum( evtseq );
         }
         /*
         else
@@ -658,6 +714,7 @@ int MbdEvent::SetRawData(Event *event, MbdRawContainer *bbcraws, MbdPmtContainer
 
         _mbdsig[feech].SetNSamples( _nsamples );
         _mbdsig[feech].SetXY(m_samp[feech], m_adc[feech]);
+        _mbdsig[feech].SetEvtNum( m_evt );
         //_mbdsig[feech].Print();
       }
 
@@ -760,7 +817,7 @@ int MbdEvent::ProcessPackets(MbdRawContainer *bbcraws)
       m_ampl[ifeech] = _mbdsig[ifeech].GetAmpl(); // in adc units
       if (do_templatefit)
       {
-        //std::cout << "fittemplate" << std::endl;
+        //std::cout << "fittemplate " << ifeech << std::endl;
         _mbdsig[ifeech].FitTemplate( _mbdcal->get_sampmax(ifeech) );
 
         /*
@@ -784,6 +841,8 @@ int MbdEvent::ProcessPackets(MbdRawContainer *bbcraws)
   {
     int feech = _mbdgeom->get_feech(ipmt);
     bbcraws->get_pmt(ipmt)->set_pmt(ipmt, m_ampl[feech], m_ttdc[ipmt], m_qtdc[ipmt]);
+    bbcraws->get_pmt(ipmt)->set_chi2ndf( _mbdsig[feech].GetChi2NDF() );
+    bbcraws->get_pmt(ipmt)->set_fitinfo( _mbdsig[feech].GetFitInfo() );
   }
   bbcraws->set_npmt(MbdDefs::BBC_N_PMT);  // this would need to be changed if we zero-suppressed
   bbcraws->set_clocks(m_evt, m_clk, m_femclk);
@@ -901,7 +960,10 @@ int MbdEvent::ProcessRawContainer(MbdRawContainer *bbcraws, MbdPmtContainer *bbc
   // Copy to output
   for (int ipmt = 0; ipmt < MbdDefs::BBC_N_PMT; ipmt++)
   {
+    int feech = _mbdgeom->get_feech(ipmt);
     bbcpmts->get_pmt(ipmt)->set_pmt(ipmt, m_pmtq[ipmt], m_pmttt[ipmt], m_pmttq[ipmt]);
+    bbcraws->get_pmt(ipmt)->set_chi2ndf( _mbdsig[feech].GetChi2NDF() );
+    bbcraws->get_pmt(ipmt)->set_fitinfo( _mbdsig[feech].GetFitInfo() );
   }
   bbcpmts->set_npmt(MbdDefs::BBC_N_PMT);
 
@@ -1369,7 +1431,7 @@ int MbdEvent::FillSampMaxCalib()
   // _no_sampmax keeps track of how many events to use for on-the-fly calibration
   _no_sampmax--;
 
-  if ( _no_sampmax==0 && _calpass != 1 )
+  if ( _no_sampmax==0 && _calpass==0 )
   {
     CalcSampMaxCalib();
     _calib_done = 1;

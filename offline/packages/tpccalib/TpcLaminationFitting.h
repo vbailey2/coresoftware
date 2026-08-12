@@ -1,14 +1,20 @@
 #ifndef TPCCALIB_TPCLAMINATIONFITTING_H
 #define TPCCALIB_TPCLAMINATIONFITTING_H
 
+
+//#include <g4detectors/PHG4TpcGeom.h>
+//#include <g4detectors/PHG4TpcGeomContainer.h>
+
+#include <tpc/LaserClusterHelper.h>
 #include <tpc/TpcDistortionCorrection.h>
 #include <tpc/TpcDistortionCorrectionContainer.h>
 
+//#include <trackbase/ActsGeometry.h>
 #include <trackbase/TrkrClusterContainer.h>
 #include <trackbase/TrkrDefs.h>
 
 #include <fun4all/SubsysReco.h>
-
+#include <TVectorD.h>
 class PHCompositeNode;
 
 class LaserClusterContainer;
@@ -60,6 +66,14 @@ class TpcLaminationFitting : public SubsysReco
 
   void set_nLayerCut(unsigned int cut) { m_nLayerCut = cut; }
 
+  void set_useSDLayerCut(bool useCut) { m_useSDLayerCut = useCut; }
+
+  void set_adcWeight(bool useADC) { m_adcWeight = useADC; }
+
+  void set_lam_grid_dimensions(int phibins, int rbins);
+
+  void set_useZ(bool use) { m_useZ = use; }
+
   int InitRun(PHCompositeNode *topNode) override;
 
   int process_event(PHCompositeNode *topNode) override;
@@ -109,7 +123,11 @@ class TpcLaminationFitting : public SubsysReco
   TH2 *phiDistortionLamination[2]{nullptr};
   //TH2 *scaleFactorMap[2]{nullptr};
 
+  TH2 *clusterMap[2]{nullptr};
+
   unsigned int m_nLayerCut{1};
+  bool m_useSDLayerCut{true};
+  bool m_adcWeight{false};
   
   bool m_useHeader{true};
 
@@ -148,6 +166,13 @@ class TpcLaminationFitting : public SubsysReco
   double m_rmse{};
   int m_nBins{0};
 
+  TVectorD m_A_zdc{2};
+  TVectorD m_B_zdc{2};
+  TVectorD m_C_zdc{2};
+  
+  int m_lamPhiBins{200};
+  int m_lamRBins{200};
+
   int m_phibins{80};
   static constexpr float m_phiMin{0};
   static constexpr float m_phiMax{2. * M_PI};
@@ -172,11 +197,14 @@ class TpcLaminationFitting : public SubsysReco
   const double adjust = 0.015;
   */
 
-  std::vector<double> m_truthR[2];
-  std::vector<double> m_truthPhi[2];
+  std::vector<double> m_truthR[2]{};
+  std::vector<double> m_truthPhi[2]{};
 
   double m_phiModMin[2]{-M_PI/18, 0.0};
   double m_phiModMax[2]{M_PI/18, M_PI/9};
+
+  LaserClusterHelper m_laserClusterHelper;
+  bool m_useZ{false};
 };
 
 #endif

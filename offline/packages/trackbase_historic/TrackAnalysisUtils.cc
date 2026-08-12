@@ -1,9 +1,9 @@
 #include "TrackAnalysisUtils.h"
 
-#include <globalvertex/GlobalVertex.h>
+#include "SvtxTrack.h"
+#include "TrackSeed.h"
 
-#include <phool/PHCompositeNode.h>
-#include <phool/getClass.h>
+#include <globalvertex/GlobalVertex.h>
 
 #include <trackbase/ActsGeometry.h>
 #include <trackbase/TpcDefs.h>
@@ -11,8 +11,9 @@
 #include <trackbase/TrkrClusterContainer.h>
 
 #include <g4detectors/PHG4TpcGeomContainer.h>
-#include "SvtxTrack.h"
-#include "TrackSeed.h"
+
+#include <phool/PHCompositeNode.h>
+#include <phool/getClass.h>
 
 #include <cmath>
 
@@ -274,7 +275,7 @@ namespace TrackAnalysisUtils
     rot(2, 2) = 1;
     return rot;
   }
-  std::vector<TrkrDefs::cluskey> get_cluster_keys(TrackSeed* seed)
+  std::vector<TrkrDefs::cluskey> get_cluster_keys(const TrackSeed* seed)
   {
     std::vector<TrkrDefs::cluskey> out;
 
@@ -285,8 +286,48 @@ namespace TrackAnalysisUtils
 
     return out;
   }
-
-  std::vector<TrkrDefs::cluskey> get_cluster_keys(SvtxTrack* track)
+  std::tuple<int, int, int, int> get_cluster_counts(const SvtxTrack* track)
+  {
+    std::tuple<int, int, int, int> counts(0, 0, 0, 0);
+    for (const auto& key : get_cluster_keys(track))
+    {
+      auto trkrid = TrkrDefs::getTrkrId(key);
+      switch (trkrid)
+      {
+        case TrkrDefs::mvtxId:
+          std::get<0>(counts)++;
+          break;
+        case TrkrDefs::inttId:
+          std::get<1>(counts)++;
+          break;
+        case TrkrDefs::tpcId:
+          std::get<2>(counts)++;
+          break;
+        case TrkrDefs::micromegasId:
+          std::get<3>(counts)++;
+          break;
+        default:
+          break;
+      }
+    }
+    return counts;
+  }
+  int get_cluster_count(const TrackSeed* seed, const TrkrDefs::TrkrId& trkrid)
+  {
+    int count = 0;
+    if (seed)
+    {
+      for (const auto& key : get_cluster_keys(seed))
+      {
+        if (TrkrDefs::getTrkrId(key) == trkrid)
+        {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+  std::vector<TrkrDefs::cluskey> get_cluster_keys(const SvtxTrack* track)
   {
     std::vector<TrkrDefs::cluskey> out;
     for (const auto& seed : {track->get_silicon_seed(), track->get_tpc_seed()})
@@ -307,12 +348,13 @@ namespace TrackAnalysisUtils
     TpcGlobalPositionWrapper globalWrapper;
     globalWrapper.loadNodes(topNode);
     globalWrapper.set_suppressCrossing(true);
-    TpcClusterMover mover;
-    auto* tpccellgeo = findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
-    mover.initialize_geometry(tpccellgeo);
-    mover.set_verbosity(0);
 
+    
     auto* geometry = findNode::getClass<ActsGeometry>(topNode, "ActsGeometry");
+    auto* tpccellgeo = findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
+    TpcClusterMover mover;
+    mover.initialize_geometry(tpccellgeo, geometry, topNode);
+    mover.set_verbosity(0);
 
     std::vector<std::pair<TrkrDefs::cluskey, Acts::Vector3>> global_raw;
 
@@ -368,13 +410,24 @@ namespace TrackAnalysisUtils
       }
       Surface surf = geometry->maps().getSurface(ckey, cluster);
       Surface surf_ideal = geometry->maps().getSurface(ckey, cluster);  // Unchanged by distortion corrections
-      // if this is a TPC cluster, the crossing correction may have moved it across the central membrane, check the surface
       auto trkrid = TrkrDefs::getTrkrId(ckey);
       if (trkrid == TrkrDefs::tpcId)
       {
+	TrkrDefs::subsurfkey sskey = cluster->getSubSurfKey();
         TrkrDefs::hitsetkey hitsetkey = TrkrDefs::getHitSetKeyFromClusKey(ckey);
-        TrkrDefs::subsurfkey new_subsurfkey = 0;
-        surf = geometry->get_tpc_surface_from_coords(hitsetkey, clusglob_moved, new_subsurfkey);
+        TrkrDefs::subsurfkey new_sskey = 0;
+        surf = geometry->get_tpc_surface_from_coords(hitsetkey, clusglob_moved, new_sskey);
+	if (!surf)
+	  {
+	    std::cout << PHWHERE << " WARNING: failed to find moved-cluster surface for "
+		      << ckey << std::endl;
+	    continue;
+	  }
+	if(new_sskey != sskey)
+	  {
+	    // ClusterMover should have updated the subsurface key, so this should not happen
+	    std::cout << PHWHERE << " WARNING: subsurface key change from " << sskey << " to " << new_sskey << std::endl;
+	  }
       }
 
       auto loc = geometry->getLocalCoords(ckey, cluster, track->get_crossing());
@@ -392,7 +445,7 @@ namespace TrackAnalysisUtils
       {
         // otherwise take the manual calculation for the TPC
         // doing it this way just avoids the bounds check that occurs in the surface class method
-        Acts::Vector3 loct = surf->transform(geometry->geometry().getGeoContext()).inverse() * clusglob_moved;  // global is in mm
+        Acts::Vector3 loct = surf->localToGlobalTransform(geometry->geometry().getGeoContext()).inverse() * clusglob_moved;  // global is in mm
         loct /= Acts::UnitConstants::cm;
 
         loc(0) = loct(0);

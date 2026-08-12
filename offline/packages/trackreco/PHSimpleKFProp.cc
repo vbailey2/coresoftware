@@ -49,6 +49,7 @@
 
 #include <omp.h>
 
+#include <bit>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
@@ -60,7 +61,7 @@ namespace
 {
   // square
   template <class T>
-  inline constexpr T square(const T& x)
+  constexpr T square(const T& x)
   {
     return x * x;
   }
@@ -73,12 +74,6 @@ PHSimpleKFProp::PHSimpleKFProp(const std::string& name)
 {}
 
 //______________________________________________________
-int PHSimpleKFProp::End(PHCompositeNode* /*unused*/)
-{
-  return Fun4AllReturnCodes::EVENT_OK;
-}
-
-//______________________________________________________
 int PHSimpleKFProp::InitRun(PHCompositeNode* topNode)
 {
   int ret = get_nodes(topNode);
@@ -89,7 +84,7 @@ int PHSimpleKFProp::InitRun(PHCompositeNode* topNode)
 
   // load magnetic field from node tree
   /* note: if field is not found it is created with default configuration, as defined in PHFieldUtility */
-  const auto field_map = PHFieldUtility::GetFieldMapNode(nullptr, topNode);
+  auto *const field_map = PHFieldUtility::GetFieldMapNode(nullptr, topNode);
 
   // alice kalman filter
   fitter = std::make_unique<ALICEKF>(_cluster_map, field_map, _min_clusters_per_track, _max_sin_phi, Verbosity());
@@ -104,7 +99,7 @@ int PHSimpleKFProp::InitRun(PHCompositeNode* topNode)
   fitter->setFixedClusterError(2, _fixed_clus_err.at(2));
 
   // properly set constField in ALICEKF, based on PHFieldConfig
-  const auto field_config = PHFieldUtility::GetFieldConfigNode(nullptr, topNode);
+  auto *const field_config = PHFieldUtility::GetFieldConfigNode(nullptr, topNode);
   if( field_config->get_field_config() == PHFieldConfig::kFieldUniform )
   { fitter->setConstBField(field_config->get_field_mag_z()); }
 
@@ -154,7 +149,7 @@ int PHSimpleKFProp::get_nodes(PHCompositeNode* topNode)
   }
 
   // tpc grometry
-  auto geom_container = findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
+  auto *geom_container = findNode::getClass<PHG4TpcGeomContainer>(topNode, "TPCGEOMCONTAINER");
   if (!geom_container)
   {
     std::cerr << PHWHERE << "ERROR: Can't find node TPCGEOMCONTAINER" << std::endl;
@@ -230,7 +225,7 @@ int PHSimpleKFProp::process_event(PHCompositeNode* topNode)
       }
 
       // if not a TPC track, ignore
-      auto track = _track_map->get(track_it);
+      auto *track = _track_map->get(track_it);
       const bool is_tpc = std::any_of(
         track->begin_cluster_keys(),
         track->end_cluster_keys(),
@@ -247,7 +242,7 @@ int PHSimpleKFProp::process_event(PHCompositeNode* topNode)
         // copy seed clusters position into local map
         std::map<TrkrDefs::cluskey, Acts::Vector3> trackClusPositions;
         std::transform(track->begin_cluster_keys(), track->end_cluster_keys(), std::inserter(trackClusPositions, trackClusPositions.end()),
-          [globalPositions](const auto& key)
+          [&globalPositions](const auto& key)
         { return std::make_pair(key, globalPositions.at(key)); });
 
         /// Can't circle fit a seed with less than 3 clusters, skip it
@@ -322,7 +317,7 @@ int PHSimpleKFProp::process_event(PHCompositeNode* topNode)
         // copy seed clusters position into local map
         std::map<TrkrDefs::cluskey, Acts::Vector3> pretrackClusPositions;
         std::transform(pretrack.begin_cluster_keys(), pretrack.end_cluster_keys(), std::inserter(pretrackClusPositions, pretrackClusPositions.end()),
-          [globalPositions](const auto& key)
+          [&globalPositions](const auto& key)
           { return std::make_pair(key, globalPositions.at(key)); });
 
         // fit seed
@@ -335,7 +330,7 @@ int PHSimpleKFProp::process_event(PHCompositeNode* topNode)
 
         if (finalchain.size() > kl.at(0).size())
         {
-          local_chains.push_back(std::move(finalchain));
+          local_chains.push_back(finalchain);
         }
         else
         {
@@ -435,6 +430,7 @@ int PHSimpleKFProp::process_event(PHCompositeNode* topNode)
 Acts::Vector3 PHSimpleKFProp::getGlobalPosition(TrkrDefs::cluskey key, TrkrCluster* cluster) const
 {
   // get global position from Acts transform
+  
   return _pp_mode ?
     m_tgeometry->getGlobalPosition(key, cluster):
     m_globalPositionWrapper.getGlobalPositionDistortionCorrected( key, cluster, 0 );
@@ -897,9 +893,9 @@ bool PHSimpleKFProp::PropagateStep(
 
   // search for closest available cluster within window
   double query_pt[3] = {new_tx, new_ty, new_tz};
-  std::vector<long unsigned int> index_out(1);
-  std::vector<double> distance_out(1);
-  int n_results = _kdtrees[next_layer]->knnSearch(&query_pt[0], 1, &index_out[0], &distance_out[0]);
+  std::array<size_t, 1> index_out{};
+  std::array<double, 1> distance_out{};
+  int n_results = _kdtrees[next_layer]->knnSearch(&query_pt[0], 1, index_out.data(), distance_out.data());
 
   // if no results, then no cluster to add, but propagation is not necessarily done
   if (!n_results)
@@ -912,9 +908,9 @@ bool PHSimpleKFProp::PropagateStep(
     return true;
   }
   const std::vector<double>& point = _ptclouds[next_layer]->pts[index_out[0]];
-  TrkrDefs::cluskey closest_ckey = (*((int64_t*) &point[3]));
+  TrkrDefs::cluskey closest_ckey = std::bit_cast<int64_t>(point[3]);
   TrkrCluster* clusterCandidate = _cluster_map->findCluster(closest_ckey);
-  const auto candidate_globalpos = globalPositions.at(closest_ckey);
+  const auto &candidate_globalpos = globalPositions.at(closest_ckey);
   const double cand_x = candidate_globalpos(0);
   const double cand_y = candidate_globalpos(1);
   const double cand_z = candidate_globalpos(2);
@@ -1235,11 +1231,6 @@ std::vector<TrkrDefs::cluskey> PHSimpleKFProp::PropagateTrack(TrackSeed* track, 
     std::cout << std::endl;
   }
 
-  // get layer for each cluster
-  std::vector<unsigned int> layers;
-  std::transform(ckeys.begin(), ckeys.end(), std::back_inserter(layers), [](const TrkrDefs::cluskey& key)
-                 { return TrkrDefs::getLayer(key); });
-
   double old_phi = track_phi;
   unsigned int old_layer = TrkrDefs::getLayer(ckeys[0]);
   if (Verbosity() > 1)
@@ -1376,7 +1367,7 @@ void PHSimpleKFProp::rejectAndPublishSeeds(std::vector<TrackSeed_v2>& seeds, con
 
       PositionMap local;
       std::transform(seed.begin_cluster_keys(), seed.end_cluster_keys(), std::inserter(local, local.end()),
-        [positions](const auto& key)
+        [&positions](const auto& key)
         { return std::make_pair(key, positions.at(key)); });
       TrackSeedHelper::circleFitByTaubin(&seed,local, 7, 55);
       TrackSeedHelper::lineFit(&seed,local, 7, 55);

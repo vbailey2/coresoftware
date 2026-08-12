@@ -15,7 +15,7 @@
 #include <g4tracking/TrkrTruthTrackContainer.h>
 
 
-
+#include <fstream>
 #include <algorithm>
 #include <cmath>  // for sqrt, cos, sin
 #include <format>
@@ -183,6 +183,12 @@ void TpcClusterBuilder::cluster_hits(TrkrTruthTrack* track)
 
       adc_sum += adc;
     }
+
+    if(adc_sum == 0)
+      {
+	continue;
+      }
+    
     if (mClusHitsVerbose)
     {
       if (verbosity > 10)
@@ -330,9 +336,11 @@ void TpcClusterBuilder::cluster_hits(TrkrTruthTrack* track)
     }  // end debug printing
 
     // get the global vector3 to then get the surface local phi and z
-    Acts::Vector3 global(clusx, clusy, clusz);
+    Acts::Vector3 global_env(clusx, clusy, clusz);
     TrkrDefs::subsurfkey subsurfkey = 0;
 
+    // get_tpc_surface_from coords and the Acts transform both expect coordinates in world (i.e. tilted TPC) coordinates
+    Acts::Vector3 global =  m_tGeometry->transformTpcEnvelopeToWorld(global_env);
     Surface surface = m_tGeometry->get_tpc_surface_from_coords(
         hitsetkey, global, subsurfkey);
 
@@ -351,7 +359,7 @@ void TpcClusterBuilder::cluster_hits(TrkrTruthTrack* track)
 
     global *= Acts::UnitConstants::cm;
 
-    Acts::Vector3 local = surface->transform(m_tGeometry->geometry().getGeoContext()).inverse() * global;
+    Acts::Vector3 local = surface->localToGlobalTransform(m_tGeometry->geometry().getGeoContext()).inverse() * global;
     local /= Acts::UnitConstants::cm;
 
     auto* cluster = new TrkrClusterv4;  //

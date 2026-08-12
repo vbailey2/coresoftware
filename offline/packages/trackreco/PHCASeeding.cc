@@ -31,6 +31,7 @@
 #include <trackbase/TrkrClusterHitAssoc.h>
 #include <trackbase/TrkrClusterIterationMapv1.h>
 #include <trackbase/TrkrDefs.h>  // for getLayer, clu...
+#include <trackbase/TpcDefs.h>
 #include <trackbase_historic/TrackSeedContainer.h>
 
 // ROOT includes for debugging
@@ -56,6 +57,8 @@
 #include <unordered_set>
 #include <utility>  // for pair, make_pair
 #include <vector>
+
+#include <cstdint>  // for uint8_t, uint16_t, uint32_t
 
 //#define _DEBUG_
 
@@ -125,6 +128,7 @@ namespace
   inline double get_phi(const Acts::Vector3& position)
   {
     double phi = std::atan2(position.y(), position.x());
+
     if (phi < 0)
     {
       phi += 2. * M_PI;

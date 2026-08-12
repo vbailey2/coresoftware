@@ -41,11 +41,11 @@ class TrackSeedContainer;
 class TrkrClusterContainer;
 class SvtxAlignmentStateMap;
 class PHG4TpcGeomContainer;
+class PHCompositeNode;
 
 using SourceLink = ActsSourceLink;
 using FitResult = ActsTrackFittingAlgorithm::TrackFitterResult;
 using Trajectory = ActsExamples::Trajectories;
-using Measurement = Acts::Measurement<Acts::BoundIndices, 2>;
 using SurfacePtrVec = std::vector<const Acts::Surface*>;
 using SourceLinkVec = std::vector<Acts::SourceLink>;
 
@@ -78,10 +78,21 @@ class PHActsTrkFitter : public SubsysReco
     m_fitSiliconMMs = fitSiliconMMs;
   }
 
-  /// with direct navigation, force a fit with only silicon hits
+  /// FOR ALIGNMENT STUDIES ONLY, USE AT OWN RISK. With direct navigation, force a fit with only silicon hits and a full
+  /// matched (si+tpc track seed). This requires a standard track fit to be run first, followed by refit configured with
+  /// the option below. NOTE this uses the TPC track seed pT for the final pT value, to compensate for poor pt resolution
+  /// with the silicon seeds only.
   void forceSiOnlyFit(bool forceSiOnlyFit)
   {
     m_forceSiOnlyFit = forceSiOnlyFit;
+  }
+
+  /// FOR ALIGNMENT STUDIES ONLY, USE AT OWN RISK. With direct navigation, force a fit with only tpc hits and a full
+  /// matched (si+tpc track seed). This requires a standard track fit to be run first, followed by refit configured with
+  /// the option below. NOTE this has poor pointing as the Si is not used for an initial guess of the track pointing
+  void forceTpcOnlyFit(bool forceTpcOnlyFit)
+  {
+    m_forceTpcOnlyFit = forceTpcOnlyFit;
   }
 
   /// require micromegas in SiliconMM fits
@@ -145,7 +156,21 @@ class PHActsTrkFitter : public SubsysReco
   void setTrkrClusterContainerName(const std::string& name) { m_clusterContainerName = name; }
   void setDirectNavigation(bool flag) { m_directNavigation = flag; }
   void setClusterEdgeRejection(int edge ) { m_cluster_edge_rejection = edge; }
- private:
+
+  /// extrapolation mode
+  enum class ExtrapolationMode
+  {
+    Default, // the default extrapolation mode, using fitter track parameters at origin
+    Forward, // uses the track state vector closest to the requested layer, before
+    Backward, // uses the track state vector closest to the requested layer, after
+    Bidirectional // uses the weighted average of the forward and backward extrapolation, when available
+  };
+
+  /// extrapolation mode
+  void setExtrapolationMode( const ExtrapolationMode value )
+  { m_extrapolation_mode = value; }
+
+  private:
   /// Get all the nodes
   int getNodes(PHCompositeNode* topNode);
 
@@ -156,7 +181,7 @@ class PHActsTrkFitter : public SubsysReco
 
   /// Convert the acts track fit result to an svtx track
   void updateSvtxTrack(
-      const std::vector<Acts::MultiTrajectoryTraits::IndexType>& tips,
+      const std::vector<Acts::TrackIndexType>& tips,
       const Trajectory::IndexedParameters& paramsMap,
       const ActsTrackFittingAlgorithm::TrackContainer& tracks,
       SvtxTrack* track);
@@ -201,7 +226,7 @@ class PHActsTrkFitter : public SubsysReco
   alignmentTransformationContainer* m_alignmentTransformationMap = nullptr;  // added for testing purposes
   alignmentTransformationContainer* m_alignmentTransformationMapTransient = nullptr;
   std::set<Acts::GeometryIdentifier> m_transient_id_set;
-  Acts::GeometryContext m_transient_geocontext;
+  Acts::GeometryContext m_transient_geocontext = Acts::GeometryContext::dangerouslyDefaultConstruct();
   SvtxTrackMap* m_trackMap = nullptr;
   SvtxTrackMap* m_directedTrackMap = nullptr;
   TrkrClusterContainer* m_clusterContainer = nullptr;
@@ -215,8 +240,8 @@ class PHActsTrkFitter : public SubsysReco
   /// Boolean to use normal tracking geometry navigator or the
   /// Acts::DirectedNavigator with a list of sorted silicon+MM surfaces
   bool m_fitSiliconMMs = false;
-
   bool m_forceSiOnlyFit = false;
+  bool m_forceTpcOnlyFit = false;
 
   /// requires micromegas present when fitting silicon-MM surfaces
   bool m_useMicromegas = true;
@@ -234,6 +259,7 @@ class PHActsTrkFitter : public SubsysReco
   /// Flag for pp running
   bool m_pp_mode = false;
 
+  /// direct navigation, in acts
   bool m_directNavigation = true;
 
   // do we have a constant field
@@ -246,7 +272,12 @@ class PHActsTrkFitter : public SubsysReco
   // name of TRKR_CLUSTER container
   std::string m_clusterContainerName = "TRKR_CLUSTER";
 
+  /// true if clusters on edge are removed from the fit
   int m_cluster_edge_rejection = 0;
+
+  /// extrapolation mode
+  ExtrapolationMode m_extrapolation_mode = ExtrapolationMode::Bidirectional;
+
   //!@name evaluator
   //@{
   bool m_actsEvaluator = false;
@@ -296,23 +327,7 @@ class PHActsTrkFitter : public SubsysReco
 
   std::vector<const Acts::Surface*> m_materialSurfaces = {};
 
-  struct MaterialSurfaceSelector
-  {
-    std::vector<const Acts::Surface*> surfaces = {};
-
-    /// @param surface is the test surface
-    void operator()(const Acts::Surface* surface)
-    {
-      if (surface->surfaceMaterial() != nullptr)
-      {
-        if (std::find(surfaces.begin(), surfaces.end(), surface) ==
-            surfaces.end())
-        {
-          surfaces.push_back(surface);
-        }
-      }
-    }
-  };
+  PHCompositeNode *_topNode = nullptr;
 };
 
 #endif

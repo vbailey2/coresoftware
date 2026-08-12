@@ -32,6 +32,7 @@ class TrackSeedContainer;
 class TrkrClusterContainer;
 class SvtxAlignmentStateMap;
 class PHG4TpcGeomContainer;
+class PHCompositeNode;
 
 class TFile;
 class TTree;
@@ -39,7 +40,6 @@ class TTree;
 using SourceLink = ActsSourceLink;
 using FitResult = ActsTrackFittingAlgorithm::TrackFitterResult;
 using Trajectory = ActsExamples::Trajectories;
-using Measurement = Acts::Measurement<Acts::BoundIndices, 2>;
 using SurfacePtrVec = std::vector<const Acts::Surface*>;
 using SourceLinkVec = std::vector<Acts::SourceLink>;
 
@@ -63,11 +63,13 @@ class PHCosmicsTrkFitter : public SubsysReco
 
   int ResetEvent(PHCompositeNode* topNode) override;
 
+  void convertSeeds() { m_dumpSeeds = true; }
+
   void setUpdateSvtxTrackStates(bool fillSvtxTrackStates)
   {
     m_fillSvtxTrackStates = fillSvtxTrackStates;
   }
-
+  void directNavigator() { m_directNavigation = true; }
   void useActsEvaluator(bool actsEvaluator)
   {
     m_actsEvaluator = actsEvaluator;
@@ -104,14 +106,15 @@ class PHCosmicsTrkFitter : public SubsysReco
   int createNodes(PHCompositeNode* topNode);
 
   void loopTracks(Acts::Logging::Level logLevel);
-  void getCharge(TrackSeed* track, int& charge, float& cosmicslope);
+  int getCharge(TrackSeed* tpcseed, const std::vector<Acts::Vector3>& sorted_positions);
 
   /// Convert the acts track fit result to an svtx track
-  void updateSvtxTrack(std::vector<Acts::MultiTrajectoryTraits::IndexType>& tips,
+  void updateSvtxTrack(std::vector<Acts::TrackIndexType>& tips,
                        Trajectory::IndexedParameters& paramsMap,
                        ActsTrackFittingAlgorithm::TrackContainer& tracks,
                        SvtxTrack* track);
-
+  Acts::Vector3 calculatePCA(TrackSeed* seed, const std::vector<Acts::Vector3>& sorted_positions) const;
+  Acts::Vector3 calculateMomentum(TrackSeed* tpcseed, const std::vector<Acts::Vector3>& sorted_positions);
   /// Helper function to call either the regular navigation or direct
   /// navigation, depending on m_fitSiliconMMs
   inline ActsTrackFittingAlgorithm::TrackFitterResult fitTrack(
@@ -151,7 +154,7 @@ class PHCosmicsTrkFitter : public SubsysReco
   // Used for distortion correction transformations
   alignmentTransformationContainer* m_alignmentTransformationMapTransient = nullptr;
   std::set<Acts::GeometryIdentifier> m_transient_id_set;
-  Acts::GeometryContext m_transient_geocontext;
+  Acts::GeometryContext m_transient_geocontext = Acts::GeometryContext::dangerouslyDefaultConstruct();
 
   /// Number of acts fits that returned an error
   int m_nBadFits = 0;
@@ -162,6 +165,8 @@ class PHCosmicsTrkFitter : public SubsysReco
 
   /// A bool to update the SvtxTrackState information (or not)
   bool m_fillSvtxTrackStates = true;
+
+  bool m_directNavigation = false;
 
   // do we have a constant field
   bool m_ConstField = false;
@@ -177,7 +182,6 @@ class PHCosmicsTrkFitter : public SubsysReco
   std::unique_ptr<ActsEvaluator> m_evaluator = nullptr;
   std::string m_evalname = "ActsEvaluator.root";
 
-  std::map<const unsigned int, Trajectory>* m_trajectories = nullptr;
   SvtxTrackMap* m_seedTracks = nullptr;
 
   //! tpc global position wrapper
@@ -200,8 +204,12 @@ class PHCosmicsTrkFitter : public SubsysReco
   SvtxAlignmentStateMap* m_alignmentStateMap = nullptr;
   ActsAlignmentStates m_alignStates;
 
+  std::vector<const Acts::Surface*> m_materialSurfaces = {};
+
   bool m_zeroField = false;
   PHG4TpcGeomContainer* _tpccellgeo = nullptr;
+
+  bool m_dumpSeeds = false;
 
   //! for diagnosing seed param + clusters
   bool m_seedClusAnalysis = false;
@@ -229,6 +237,8 @@ class PHCosmicsTrkFitter : public SubsysReco
   void clearVectors();
   void fillVectors(TrackSeed* tpcseed, TrackSeed* siseed);
   ClusterErrorPara m_clusErrPara;
+
+  PHCompositeNode *m_topNode = nullptr;
 };
 
 #endif

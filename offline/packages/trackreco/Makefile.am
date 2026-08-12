@@ -34,7 +34,6 @@ pkginclude_HEADERS = \
   MakeActsGeometry.h \
   MakeSourceLinks.h \
   nanoflann.hpp \
-  PHActsGSF.h \
   PHActsKDTreeSeeding.h \
   PHActsSiliconSeeding.h \
   PHActsVertexPropagator.h \
@@ -61,6 +60,7 @@ pkginclude_HEADERS = \
   PHTrackPruner.h \
   PHTrackCleaner.h \
   PHTrackSelector.h \
+  PHTrackTrackSeedSynchronization.h \
   PHRaveVertexing.h \
   PHSiliconHelicalPropagator.h \
   PHSiliconSeedMerger.h \
@@ -75,8 +75,9 @@ pkginclude_HEADERS = \
   PHTrackSetMerging.h \
   PHTrackSetCopyMerging.h \
   PHTruthClustering.h \
-  PHTruthTrackSeeding.h \
   PHTruthSiliconAssociation.h \
+  PHTruthTrackFitter.h \
+  PHTruthTrackSeeding.h \
   PHTruthVertexing.h \
   PrelimDistortionCorrection.h \
   PrelimDistortionCorrectionAuAu.h \
@@ -101,7 +102,6 @@ ACTS_SOURCES = \
   ActsPropagator.cc \
   MakeActsGeometry.cc \
   MakeSourceLinks.cc \
-  PHActsGSF.cc \
   PHActsKDTreeSeeding.cc \
   PHActsSiliconSeeding.cc \
   PHActsTrkFitter.cc \
@@ -119,7 +119,7 @@ AM_CPPFLAGS += -I$(OFFLINE_MAIN)/include/ActsFatras
 
 ACTS_LIBS = \
   -lActsCore \
-  -lActsPluginTGeo \
+  -lActsPluginRoot \
   -lActsExamplesDetectorTGeo \
   -lActsExamplesFramework
 
@@ -157,13 +157,15 @@ libtrack_reco_la_SOURCES = \
   PHTrackClusterAssociator.cc \
   PHTrackSeeding.cc \
   PHTrackSelector.cc \
+  PHTrackTrackSeedSynchronization.cc \
   PHTrackSetMerging.cc \
   PHTrackPropagating.cc \
   PHTrackFitting.cc \
   PHTruthClustering.cc \
+  PHTruthSiliconAssociation.cc \
+  PHTruthTrackFitter.cc \
   PHTruthTrackSeeding.cc \
   PHTruthVertexing.cc \
-  PHTruthSiliconAssociation.cc \
   PrelimDistortionCorrection.cc \
   PrelimDistortionCorrectionAuAu.cc \
   SecondaryVertexFinder.cc \
@@ -174,7 +176,6 @@ libtrack_reco_la_SOURCES = \
 
 libtrack_reco_la_LIBADD = \
   -lActsCore \
-  -lActsPluginTGeo \
   -lActsExamplesDetectorTGeo \
   -lActsExamplesFramework \
   -lcalo_io \

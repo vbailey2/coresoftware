@@ -51,57 +51,110 @@ class TrkrCluster : public PHObject
   //
   // cluster position
   //
-  virtual float getLocalX() const { return NAN; }
-  virtual void setLocalX(float) {}
-  virtual float getLocalY() const { return NAN; }
-  virtual void setLocalY(float) {}
+  virtual float getLocalX() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual void setLocalX(const float) {}
+  virtual float getLocalY() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual void setLocalY(const float) {}
 
   //
   // cluster info
   //
-  virtual void setAdc(unsigned int) {}
+  virtual void setAdc(const unsigned int) {}
   virtual unsigned int getAdc() const { return UINT_MAX; }
-  virtual void setMaxAdc(uint16_t) {}
+  virtual void setMaxAdc(const uint16_t) {}
   virtual unsigned int getMaxAdc() const { return UINT_MAX; }
   virtual char getOverlap() const { return std::numeric_limits<char>::max(); }
-  virtual void setOverlap(char) {}
+  virtual void setOverlap(const char) {}
   virtual char getEdge() const { return std::numeric_limits<char>::max(); }
-  virtual void setEdge(char) {}
+  virtual void setEdge(const char) {}
   virtual void setTime(const float) {}
-  virtual float getTime() const { return NAN; }
+  virtual float getTime() const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual char getSize() const { return std::numeric_limits<char>::max(); }
 
   //
   // convenience interface
   //
-  virtual float getPhiSize() const { return NAN; }
-  virtual float getZSize() const { return NAN; }
-  virtual float getPhiError() const { return NAN; }
-  virtual float getRPhiError() const { return NAN; }
-  virtual float getZError() const { return NAN; }
+  virtual float getPhiSize() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual float getZSize() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual float getPhiError() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual float getRPhiError() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual float getZError() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual unsigned int getCenAdc() const { return UINT_MAX; }
+  virtual float getPadCen() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual float getTBinCen() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual int getPadMax() const { return std::numeric_limits<int>::max(); }
+  virtual int getTBinMax() const { return std::numeric_limits<int>::max(); }
+  virtual char getSLEdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getSREdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getTLEdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getTREdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getDLEdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getDREdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getHLEdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getHREdge() const { return std::numeric_limits<char>::max(); }
+  virtual char getSLMix() const { return std::numeric_limits<char>::max(); }
+  virtual char getSRMix() const { return std::numeric_limits<char>::max(); }
+  virtual char getTLMix() const { return std::numeric_limits<char>::max(); }
+  virtual char getTRMix() const { return std::numeric_limits<char>::max(); }
+  virtual unsigned short getPhiBinLo() const { return std::numeric_limits<unsigned short>::max(); }
+  virtual unsigned short getPhiBinHi() const { return std::numeric_limits<unsigned short>::max(); }
+  virtual unsigned short getTBinLo() const { return std::numeric_limits<unsigned short>::max(); }
+  virtual unsigned short getTBinHi() const { return std::numeric_limits<unsigned short>::max(); }
+  virtual float getPadPhase() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual float getTBinPhase() const { return std::numeric_limits<float>::quiet_NaN(); }
+  virtual float getRSize() const { return std::numeric_limits<float>::quiet_NaN(); }
+
+  virtual void setSLEdge(const char) {};
+  virtual void setSREdge(const char) {};
+  virtual void setTLEdge(const char) {};
+  virtual void setTREdge(const char) {};
+  virtual void setDLEdge(const char) {};
+  virtual void setDREdge(const char) {};
+  virtual void setHLEdge(const char) {};
+  virtual void setHREdge(const char) {};
+  virtual void setSLMix(const char) {};
+  virtual void setSRMix(const char) {};
+  virtual void setTLMix(const char) {};
+  virtual void setTRMix(const char) {};
+  virtual void setPhiBinLo(const unsigned short) {};
+  virtual void setPhiBinHi(const unsigned short) {};
+  virtual void setTBinLo(const unsigned short) {};
+  virtual void setTBinHi(const unsigned short) {};
+  virtual void setPadPhase(const float) {};
+  virtual void setTBinPhase(const float) {};
+  virtual void setRSize(const char) {};
+  virtual void setCenAdc(const uint16_t) {};
+  virtual void setPadCen(const float) {};
+  virtual void setTBinCen(const float) {};
+  virtual void setPadMax(const int) {};
+  virtual void setTBinMax(const int) {};
+  virtual void setPhiError(const float) {};
+  virtual void setZError(const float) {};
+  virtual void setPhiSize(const char) {};
+  virtual void setZSize(const char) {};
 
   /// Acts functions, for Acts modules use only
   virtual void setActsLocalError(unsigned int /*i*/, unsigned int /*j*/, float /*value*/) {}
-  virtual float getActsLocalError(unsigned int /*i*/, unsigned int /*j*/) const { return NAN; }
+  virtual float getActsLocalError(unsigned int /*i*/, unsigned int /*j*/) const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual TrkrDefs::subsurfkey getSubSurfKey() const { return TrkrDefs::SUBSURFKEYMAX; }
-  virtual void setSubSurfKey(TrkrDefs::subsurfkey /*id*/) {}
+  virtual void setSubSurfKey(const TrkrDefs::subsurfkey /*id*/) {}
 
   // Global coordinate functions are deprecated, use local
   // coordinate functions only
-  virtual float getX() const { return NAN; }
+  virtual float getX() const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual void setX(float) {}
-  virtual float getY() const { return NAN; }
+  virtual float getY() const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual void setY(float) {}
-  virtual float getZ() const { return NAN; }
+  virtual float getZ() const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual void setZ(float) {}
-  virtual float getPosition(int /*coor*/) const { return NAN; }
+  virtual float getPosition(int /*coor*/) const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual void setPosition(int /*coor*/, float /*xi*/) {}
   virtual void setGlobal() {}
   virtual void setLocal() {}
   virtual bool isGlobal() const { return true; }
-  virtual float getError(unsigned int /*i*/, unsigned int /*j*/) const { return NAN; }
+  virtual float getError(unsigned int /*i*/, unsigned int /*j*/) const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual void setError(unsigned int /*i*/, unsigned int /*j*/, float /*value*/) {}
-  virtual float getSize(unsigned int /*i*/, unsigned int /*j*/) const { return NAN; }
+  virtual float getSize(unsigned int /*i*/, unsigned int /*j*/) const { return std::numeric_limits<float>::quiet_NaN(); }
   virtual void setSize(unsigned int /*i*/, unsigned int /*j*/, float /*value*/) {}
 
  protected:

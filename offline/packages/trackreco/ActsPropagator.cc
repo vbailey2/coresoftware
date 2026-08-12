@@ -1,7 +1,5 @@
 #include "ActsPropagator.h"
 
-#include <trackbase/ActsAborter.h>
-
 #include <trackbase_historic/ActsTransformations.h>
 #include <trackbase_historic/SvtxTrack.h>
 #include <trackbase_historic/SvtxTrackMap.h>
@@ -10,13 +8,69 @@
 
 #include <globalvertex/SvtxVertex.h>
 #include <globalvertex/SvtxVertexMap.h>
-#include <Acts/Propagator/VoidNavigator.hpp>
+
 #include <Acts/EventData/ParticleHypothesis.hpp>
 #include <Acts/Geometry/GeometryIdentifier.hpp>
 #include <Acts/MagneticField/ConstantBField.hpp>
 #include <Acts/MagneticField/MagneticFieldProvider.hpp>
+#include <Acts/Propagator/VoidNavigator.hpp>
 #include <Acts/Surfaces/PerigeeSurface.hpp>
+#include <Acts/Definitions/Units.hpp>
 
+namespace
+{
+
+  /// local aborter class, used to tell acts to end track propagation when a given layer is used
+  /** for the time being, the class is defined locally only, because it has no usage outside of ActsPropagator */
+  struct ActsAborter
+  {
+
+    /// (ACTS) layer id at which propagation should stop
+    unsigned int abortlayer = std::numeric_limits<unsigned int>::max();
+
+    /// (ACTS) voulme id at which propagation should stop
+    unsigned int abortvolume = std::numeric_limits<unsigned int>::max();
+
+    /// called at each extrapolation step, by acts, to verify whether to stop propagation or not
+    template <typename propagator_state_t, typename stepper_t, typename navigator_t>
+      bool checkAbort(
+      propagator_state_t& state, const stepper_t& /*stepper*/,
+      const navigator_t& navigator, const Acts::Logger& /*logger*/) const
+    {
+
+      if (!navigator.currentSurface(state.navigation))
+      { return false; }
+
+      const auto& volumeno = state.navigation.currentSurface->geometryId().volume();
+      const auto& layerno = state.navigation.currentSurface->geometryId().layer();
+      const auto& sensitive = state.navigation.currentSurface->geometryId().sensitive();
+
+
+      /// Check that we are in the proper layer and that we've also reached
+      /// a sensitive surface
+      if (layerno == abortlayer && volumeno == abortvolume && sensitive != 0)
+      { return true; }
+
+
+      return false;
+    }
+
+  };
+
+  // some definition for maping acts volume/layer to sphenix layer
+  /* constexpr unsigned int kFirstMvtxLayer = 0; */
+  constexpr unsigned int kFirstInttLayer = 3;
+  constexpr unsigned int kFirstTpcLayer = 7;
+  constexpr unsigned int kFirstTpotLayer = 55;
+
+  constexpr unsigned int kMvtxVolumeId =  10;
+  constexpr unsigned int kInttVolumeId =  12;
+  constexpr unsigned int kTpcVolumeId =  14;
+  constexpr unsigned int kTpotVolumeId =  16;
+
+}
+
+//____________________________________________________________________
 ActsPropagator::SurfacePtr
 ActsPropagator::makeVertexSurface(const SvtxVertex* vertex)
 {
@@ -25,12 +79,16 @@ ActsPropagator::makeVertexSurface(const SvtxVertex* vertex)
                     vertex->get_y() * Acts::UnitConstants::cm,
                     vertex->get_z() * Acts::UnitConstants::cm));
 }
+
+//____________________________________________________________________
 ActsPropagator::SurfacePtr
 ActsPropagator::makeVertexSurface(const Acts::Vector3& vertex)
 {
   return Acts::Surface::makeShared<Acts::PerigeeSurface>(
       vertex * Acts::UnitConstants::cm);
 }
+
+//____________________________________________________________________
 ActsPropagator::BoundTrackParamResult
 ActsPropagator::makeTrackParams(SvtxTrackState* state,
                                 int trackCharge,
@@ -48,13 +106,15 @@ ActsPropagator::makeTrackParams(SvtxTrackState* state,
   Acts::BoundSquareMatrix cov = transformer.rotateSvtxTrackCovToActs(state);
 
   return ActsTrackFittingAlgorithm::TrackParameters::create(
-    surf, // NOLINT (performance-unnecessary-value-param)
-             m_geometry->geometry().getGeoContext(),
-             actsFourPos, momentum,
-             trackCharge / momentum.norm(),
-             cov,
-             Acts::ParticleHypothesis::pion());
+      m_geometry->geometry().getGeoContext(),
+      surf,  // NOLINT (performance-unnecessary-value-param)
+      actsFourPos, momentum,
+      trackCharge / momentum.norm(),
+      cov,
+      Acts::ParticleHypothesis::pion());
 }
+
+//____________________________________________________________________
 ActsPropagator::BoundTrackParamResult
 ActsPropagator::makeTrackParams(SvtxTrack* track,
                                 SvtxVertexMap* vertexMap)
@@ -85,74 +145,72 @@ ActsPropagator::makeTrackParams(SvtxTrack* track,
 
   Acts::BoundSquareMatrix cov = transformer.rotateSvtxTrackCovToActs(track);
 
-  return ActsTrackFittingAlgorithm::TrackParameters::create(perigee,
-                                                            m_geometry->geometry().getGeoContext(),
-                                                            actsFourPos, momentum,
-                                                            track->get_charge() / track->get_p(),
-                                                            cov,
-                                                            Acts::ParticleHypothesis::pion(),
-							    1*Acts::UnitConstants::cm);
+  return ActsTrackFittingAlgorithm::TrackParameters::create(
+      m_geometry->geometry().getGeoContext(), perigee,
+      actsFourPos, momentum,
+      track->get_charge() / track->get_p(),
+      cov,
+      Acts::ParticleHypothesis::pion(),
+      1 * Acts::UnitConstants::cm);
 }
 
+//____________________________________________________________________
 ActsPropagator::BTPPairResult
-ActsPropagator::propagateTrack(const Acts::BoundTrackParameters& params,
-                               const unsigned int sphenixLayer)
+ActsPropagator::propagateTrack(const Acts::BoundTrackParameters& params, const unsigned int sphenixLayer, Acts::Direction direction )
 {
-  unsigned int actsvolume;
-  unsigned int actslayer;
+  unsigned int actsvolume = 0;
+  unsigned int actslayer = 0;
   if (!checkLayer(sphenixLayer, actsvolume, actslayer) || !m_geometry)
-  {
-    return Acts::Result<BoundTrackParamPair>::failure(std::error_code(0, std::generic_category()));
-  }
+  { return Acts::Result<BoundTrackParamPair>::failure(std::make_error_code(std::errc::invalid_argument)); }
 
   if (m_verbosity > 1)
   {
     printTrackParams(params);
   }
 
-  auto propagator = makePropagator();
+  const Acts::Logging::Level loglevel = (m_verbosity > 3) ? Acts::Logging::VERBOSE : Acts::Logging::FATAL;
+  auto propagator = makePropagator(loglevel);
 
-  using Actors = Acts::ActionList<>;
-  using Aborters = Acts::AbortList<ActsAborter>;
+  // create propagator options with proper aborter
+  using actor_list_t = Acts::ActorList<ActsAborter>;
+  using propagator_options_t = SphenixPropagator::Options<actor_list_t>;
 
-  Acts::PropagatorOptions<Actors, Aborters> options(
-      m_geometry->geometry().getGeoContext(),
-      m_geometry->geometry().magFieldContext);
+  propagator_options_t  options(
+    m_geometry->geometry().getGeoContext(),
+    m_geometry->geometry().magFieldContext);
 
-  options.abortList.get<ActsAborter>().abortlayer = actslayer;
-  options.abortList.get<ActsAborter>().abortvolume = actsvolume;
+  // initialize aborter
+  options.actorList.get<ActsAborter>().abortlayer = actslayer;
+  options.actorList.get<ActsAborter>().abortvolume = actsvolume;
+  options.direction = direction;
 
   auto result = propagator.propagate(params, options);
-
-  if (result.ok())
+  if( result.ok() && result.value().endParameters )
   {
-    auto finalparams = *result.value().endParameters; // NOLINT(bugprone-unchecked-optional-access)
-    auto pathlength = result.value().pathLength;
-    auto pair = std::make_pair(pathlength, finalparams);
-
-    return Acts::Result<BoundTrackParamPair>::success(pair);
+    return Acts::Result<BoundTrackParamPair>::success({result.value().pathLength,*result.value().endParameters});
   }
 
   return result.error();
+
 }
 
+//____________________________________________________________________
 ActsPropagator::BTPPairResult
-ActsPropagator::propagateTrack(const Acts::BoundTrackParameters& params,
-                               const SurfacePtr& surface)
+ActsPropagator::propagateTrack(const Acts::BoundTrackParameters& params, const SurfacePtr& surface)
 {
   if (m_verbosity > 1)
   {
     printTrackParams(params);
   }
 
-  auto propagator = makePropagator();
+  const Acts::Logging::Level loglevel = (m_verbosity > 3) ? Acts::Logging::VERBOSE:Acts::Logging::FATAL;
+  auto propagator = makePropagator( loglevel );
 
-  Acts::PropagatorOptions<> options(m_geometry->geometry().getGeoContext(),
-                                    m_geometry->geometry().magFieldContext);
+  SphenixPropagator::Options options(m_geometry->geometry().getGeoContext(), m_geometry->geometry().magFieldContext);
 
-  auto result = propagator.propagate(params, *surface,
-                                     options);
-
+  auto intersect = surface.get()->intersect(m_geometry->geometry().getGeoContext(), params.position(m_geometry->geometry().getGeoContext()), params.momentum(), Acts::BoundaryTolerance::None(), 0.1 * Acts::UnitConstants::mm).closest();
+  options.direction = Acts::Direction::fromScalarZeroAsPositive(intersect.pathLength());
+  auto result = propagator.template propagate<Acts::BoundTrackParameters, SphenixPropagator::Options<>, Acts::ForcedSurfaceReached, Acts::PathLimitReached>(params, *surface, options);
   if (result.ok())
   {
     auto finalparams = *result.value().endParameters; // NOLINT(bugprone-unchecked-optional-access)
@@ -165,9 +223,9 @@ ActsPropagator::propagateTrack(const Acts::BoundTrackParameters& params,
   return result.error();
 }
 
+//____________________________________________________________________
 ActsPropagator::BTPPairResult
-ActsPropagator::propagateTrackFast(const Acts::BoundTrackParameters& params,
-                                   const SurfacePtr& surface)
+ActsPropagator::propagateTrackFast(const Acts::BoundTrackParameters& params, const SurfacePtr& surface)
 {
   if (m_verbosity > 1)
   {
@@ -175,18 +233,17 @@ ActsPropagator::propagateTrackFast(const Acts::BoundTrackParameters& params,
   }
 
   auto propagator = makeFastPropagator();
+  using Propagator = Acts::Propagator<Stepper, Acts::VoidNavigator>;
+  Propagator::Options<Acts::ActorList<>> options(m_geometry->geometry().getGeoContext(),
+                                                        m_geometry->geometry().magFieldContext);
 
-  Acts::PropagatorOptions<> options(m_geometry->geometry().getGeoContext(),
-                                    m_geometry->geometry().magFieldContext);
-
-  auto result = propagator.propagate(params, *surface,
-                                     options);
+  auto result = propagator.propagate(params, *surface, options);
 
   if (result.ok())
   {
-    auto finalparams = *result.value().endParameters; // NOLINT(bugprone-unchecked-optional-access)
-    auto pathlength = result.value().pathLength;
-    auto pair = std::make_pair(pathlength, finalparams);
+    const auto finalparams = *result.value().endParameters; // NOLINT(bugprone-unchecked-optional-access)
+    const auto pathlength = result.value().pathLength;
+    const auto pair = std::make_pair(pathlength, finalparams);
 
     return Acts::Result<BoundTrackParamPair>::success(pair);
   }
@@ -194,6 +251,7 @@ ActsPropagator::propagateTrackFast(const Acts::BoundTrackParameters& params,
   return result.error();
 }
 
+//____________________________________________________________________
 ActsPropagator::FastPropagator ActsPropagator::makeFastPropagator()
 {
   auto field = m_geometry->geometry().magField;
@@ -204,24 +262,23 @@ ActsPropagator::FastPropagator ActsPropagator::makeFastPropagator()
     {
       std::cout << "Using const field of val " << m_fieldval << std::endl;
     }
-    Acts::Vector3 fieldVec(0, 0, m_fieldval);
+    const Acts::Vector3 fieldVec(0, 0, m_fieldval);
     field = std::make_shared<Acts::ConstantBField>(fieldVec);
   }
 
+  // create stepper with proper magnetic field
   ActsPropagator::Stepper stepper(field);
 
-  Acts::Logging::Level logLevel = Acts::Logging::FATAL;
-  if (m_verbosity > 3)
-  {
-    logLevel = Acts::Logging::VERBOSE;
-  }
-
+  // create logger
+  const Acts::Logging::Level logLevel = (m_verbosity > 3) ? Acts::Logging::VERBOSE : Acts::Logging::FATAL;
   std::shared_ptr<const Acts::Logger> logger = Acts::getDefaultLogger("ActsPropagator", logLevel);
 
-  return ActsPropagator::FastPropagator(stepper, Acts::VoidNavigator(),
-                                        logger);
+  // create propagator and return
+  return ActsPropagator::FastPropagator(stepper, Acts::VoidNavigator(), logger);
 }
-ActsPropagator::SphenixPropagator ActsPropagator::makePropagator()
+
+//____________________________________________________________________
+ActsPropagator::SphenixPropagator ActsPropagator::makePropagator( Acts::Logging::Level logLevel)
 {
   auto field = m_geometry->geometry().magField;
 
@@ -231,27 +288,29 @@ ActsPropagator::SphenixPropagator ActsPropagator::makePropagator()
     field = std::make_shared<Acts::ConstantBField>(fieldVec);
   }
 
-  auto trackingGeometry = m_geometry->geometry().tGeometry;
-  Stepper stepper(field, m_overstepLimit);
+
+  Stepper stepper(field);
+
+  // create mavigation logger
+  std::shared_ptr<const Acts::Logger> navlogger = Acts::getDefaultLogger("ActsPropagator::NAVIGATION", logLevel);
+
+  // create navigator
+  const auto trackingGeometry = m_geometry->geometry().tGeometry;
   Acts::Navigator::Config cfg{trackingGeometry};
   cfg.resolvePassive = false;
   cfg.resolveMaterial = true;
   cfg.resolveSensitive = true;
-  Acts::Navigator navigator(cfg);
+  Acts::Navigator navigator(cfg, navlogger);
 
-  Acts::Logging::Level logLevel = Acts::Logging::FATAL;
-  if (m_verbosity > 3)
-  {
-    logLevel = Acts::Logging::VERBOSE;
-  }
-
+  // create propagator with proper logger and return
   std::shared_ptr<const Acts::Logger> logger = Acts::getDefaultLogger("ActsPropagator", logLevel);
   return SphenixPropagator(stepper, navigator, logger);
 }
 
-bool ActsPropagator::checkLayer(const unsigned int& sphenixlayer,
+//____________________________________________________________________
+bool ActsPropagator::checkLayer(const unsigned int sphenixlayer,
                                 unsigned int& actsvolume,
-                                unsigned int& actslayer)
+                                unsigned int& actslayer) const
 {
   /*
    * Acts geometry is defined in terms of volumes and layers. Within a volume
@@ -263,29 +322,29 @@ bool ActsPropagator::checkLayer(const unsigned int& sphenixlayer,
    */
 
   /// mvtx
-  if (sphenixlayer < 3)
+  if (sphenixlayer < kFirstInttLayer)
   {
-    actsvolume = 10;
+    actsvolume = kMvtxVolumeId;
     actslayer = (sphenixlayer + 1) * 2;
   }
 
   /// intt
-  else if (sphenixlayer < 7)
+  else if (sphenixlayer < kFirstTpcLayer)
   {
-    actsvolume = 12;
-    actslayer = ((sphenixlayer - 3) + 1) * 2;
+    actsvolume = kInttVolumeId;
+    actslayer = ((sphenixlayer - kFirstInttLayer) + 1) * 2;
   }
 
   /// tpc
-  else if (sphenixlayer < 55)
+  else if (sphenixlayer < kFirstTpotLayer)
   {
-    actsvolume = 14;
-    actslayer = ((sphenixlayer - 7) + 1) * 2;
+    actsvolume = kTpcVolumeId;
+    actslayer = ((sphenixlayer - kFirstTpcLayer) + 1) * 2;
   }
   /// tpot only has one layer in Acts geometry
   else
   {
-    actsvolume = 16;
+    actsvolume = kTpotVolumeId;
     actslayer = 2;
   }
 
@@ -319,6 +378,51 @@ bool ActsPropagator::checkLayer(const unsigned int& sphenixlayer,
   return true;
 }
 
+//____________________________________________________________________
+bool ActsPropagator::checkSphenixLayer( const unsigned int actsvolume, const unsigned int actslayer, unsigned int& sphenixlayer )
+{
+
+  /*
+   * Acts geometry is defined in terms of volumes and layers. Within a volume
+   * layers always begin at 2 and iterate in 2s, i.e. the MVTX is defined as a
+   * volume and the 3 layers are identifiable as 2, 4, and 6.
+   * So we convert the sPHENIX layer number here to the Acts volume and
+   * layer number that can interpret where to navigate to in the propagation.
+   * The only exception is the TPOT, which is interpreted as a single layer.
+   */
+
+  if( actsvolume == kMvtxVolumeId )
+  {
+    // mvtx
+    sphenixlayer = (actslayer/2)-1;
+    return (sphenixlayer<kFirstInttLayer);
+  }
+
+  if( actsvolume == kInttVolumeId )
+  {
+    // intt
+    sphenixlayer = (actslayer/2)+kFirstInttLayer-1;
+    return (sphenixlayer>=kFirstInttLayer && sphenixlayer<kFirstTpcLayer);
+  }
+
+  if( actsvolume == kTpcVolumeId )
+  {
+    // tpc
+    sphenixlayer = (actslayer/2)+kFirstTpcLayer-1;
+    return (sphenixlayer>=kFirstTpcLayer&&sphenixlayer<kFirstTpotLayer);
+  }
+
+  if( actsvolume == kTpotVolumeId )
+  {
+    // TPOT
+    sphenixlayer = (actslayer/2) + kFirstTpotLayer - 1;
+    return (sphenixlayer>=kFirstTpotLayer);
+  }
+
+  return false;
+}
+
+//____________________________________________________________________
 void ActsPropagator::printTrackParams(const Acts::BoundTrackParameters& params)
 {
   std::cout << "Propagating final track fit with momentum: "

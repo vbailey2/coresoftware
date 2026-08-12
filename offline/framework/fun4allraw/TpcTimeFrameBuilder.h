@@ -1,6 +1,8 @@
 #ifndef Fun4All_TpcTimeFrameBuilder_H
 #define Fun4All_TpcTimeFrameBuilder_H
 
+#include "TpcTimeFrameBuilderBase.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <deque>
@@ -24,25 +26,28 @@ class TH2;
 class TTree;
 
 // NOLINTNEXTLINE(hicpp-special-member-functions)
-class TpcTimeFrameBuilder
+class TpcTimeFrameBuilder : public TpcTimeFrameBuilderBase
 {
  public:
   explicit TpcTimeFrameBuilder(const int packet_id);
-  virtual ~TpcTimeFrameBuilder();
+  ~TpcTimeFrameBuilder() override;
 
-  int ProcessPacket(Packet *);
-  bool isMoreDataRequired(const uint64_t &gtm_bco) const;
-  void CleanupUsedPackets(const uint64_t &bclk);
-  std::vector<TpcRawHit *> &getTimeFrame(const uint64_t &gtm_bco);
+  int ProcessPacket(Packet *) override;
+  bool isMoreDataRequired(const uint64_t &gtm_bco) const override;
+  void CleanupUsedPackets(const uint64_t &bclk) override;
+  std::vector<TpcRawHit *> &getTimeFrame(const uint64_t &gtm_bco) override;
 
-  void setVerbosity(const int i);
+  void setVerbosity(int i) override;
   void setFastBCOSkip(bool fastBCOSkip = true)
   {
     m_fastBCOSkip = fastBCOSkip;
   }
 
+  void fillBadFeeMap() override;
+
   // enable saving of digital current debug TTree with file name `name`
-  void SaveDigitalCurrentDebugTTree(const std::string &name);
+  void SaveDigitalCurrentDebugTTree(const std::string &name) override;
+  void SaveBXCounterSyncCDBTTree(const std::string &name) override;
 
  protected:
   // Length for the 256-bit wide Round Robin Multiplexer for the data stream
@@ -50,7 +55,7 @@ class TpcTimeFrameBuilder
 
   static const uint16_t FEE_PACKET_MAGIC_KEY_1 = 0xfe;
   static const uint16_t FEE_PACKET_MAGIC_KEY_2 = 0xed;
-  static const uint16_t FEE_PACKET_MAGIC_KEY_3_DC = 0xdcdc; // Digital Current word[3]
+  static const uint16_t FEE_PACKET_MAGIC_KEY_3_DC = 0xdcdc;  // Digital Current word[3]
 
   static const uint16_t FEE_MAGIC_KEY = 0xba00;
   static const uint16_t GTM_MAGIC_KEY = 0xbb00;
@@ -81,8 +86,8 @@ class TpcTimeFrameBuilder
 
   int decode_gtm_data(const dma_word &gtm_word);
   int process_fee_data(unsigned int fee_id);
-  void process_fee_data_waveform(const unsigned int & fee_id, std::deque<uint16_t>& data_buffer);
-  void process_fee_data_digital_current(const unsigned int & fee_id, std::deque<uint16_t>& data_buffer);
+  void process_fee_data_waveform(const unsigned int &fee_id, std::deque<uint16_t> &data_buffer);
+  void process_fee_data_digital_current(const unsigned int &fee_id, std::deque<uint16_t> &data_buffer);
 
   struct gtm_payload
   {
@@ -112,7 +117,7 @@ class TpcTimeFrameBuilder
 
     uint16_t data_crc = 0;
     uint16_t calc_crc = 0;
-    
+
     uint16_t data_parity = 0;
     uint16_t calc_parity = 0;
 
@@ -123,18 +128,18 @@ class TpcTimeFrameBuilder
   {
     static const int MAX_CHANNELS = 8;
 
-    uint64_t gtm_bco {std::numeric_limits<uint64_t>::max()};
-    uint32_t bx_timestamp_predicted {std::numeric_limits<uint32_t>::max()};
+    uint64_t gtm_bco{std::numeric_limits<uint64_t>::max()};
+    uint32_t bx_timestamp_predicted{std::numeric_limits<uint32_t>::max()};
 
-    uint16_t fee {std::numeric_limits<uint16_t>::max()};
-    uint16_t pkt_length {std::numeric_limits<uint16_t>::max()};
-    uint16_t channel {std::numeric_limits<uint16_t>::max()};
+    uint16_t fee{std::numeric_limits<uint16_t>::max()};
+    uint16_t pkt_length{std::numeric_limits<uint16_t>::max()};
+    uint16_t channel{std::numeric_limits<uint16_t>::max()};
     // uint16_t sampa_max_channel {std::numeric_limits<uint16_t>::max()};
-    uint16_t sampa_address {std::numeric_limits<uint16_t>::max()};
-    uint32_t bx_timestamp {0};
-    uint32_t current[MAX_CHANNELS] {0};
-    uint32_t nsamples[MAX_CHANNELS] {0};
-    uint16_t data_crc {std::numeric_limits<uint16_t>::max()};
+    uint16_t sampa_address{std::numeric_limits<uint16_t>::max()};
+    uint32_t bx_timestamp{0};
+    uint32_t current[MAX_CHANNELS]{0};
+    uint32_t nsamples[MAX_CHANNELS]{0};
+    uint16_t data_crc{std::numeric_limits<uint16_t>::max()};
     uint16_t calc_crc = {std::numeric_limits<uint16_t>::max()};
     // uint16_t type {std::numeric_limits<uint16_t>::max()};
   };
@@ -153,7 +158,7 @@ class TpcTimeFrameBuilder
     std::string m_name;
     TTree *m_tDigitalCurrent = nullptr;
   };
-  DigitalCurrentDebugTTree * m_digitalCurrentDebugTTree = nullptr;
+  DigitalCurrentDebugTTree *m_digitalCurrentDebugTTree = nullptr;
 
   // -------------------------
   // GTM Matcher
@@ -370,6 +375,8 @@ class TpcTimeFrameBuilder
 
  private:
   std::vector<std::deque<uint16_t>> m_feeData;
+
+  std::map<int, std::set<int>> m_maskedFEEs;
 
   int m_verbosity = 0;
   int m_packet_id = 0;

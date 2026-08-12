@@ -289,6 +289,11 @@ enum n_cluster  // NOLINT(readability-enum-initial-value, performance-enum-size)
   nclue,
   ncluadc,
   nclumaxadc,
+  nclucenadc,
+  nclupadcen,
+  nclutbincen,
+  nclupadmax,
+  nclutbinmax,
   ncluthick,
   ncluafac,
   nclubfac,
@@ -301,7 +306,25 @@ enum n_cluster  // NOLINT(readability-enum-initial-value, performance-enum-size)
   ncluzsize,
   nclupedge,
   ncluredge,
+  nclusledge,
+  nclusredge,
+  nclutledge,
+  nclutredge,
+  ncludledge,
+  ncludredge,
+  ncluhledge,
+  ncluhredge,
+  ncluslmix,
+  nclusrmix,
+  nclutlmix,
+  nclutrmix,
   ncluovlp,
+  ncluphibinlo,
+  ncluphibinhi,
+  nclutbinlo,
+  nclutbinhi,
+  nclupadphase,
+  nclutbinphase,
   nclutrackID,
   ncluniter,
   clusize = ncluniter + 1
@@ -337,7 +360,7 @@ int TrkrNtuplizer::Init(PHCompositeNode* /*unused*/)
   std::string str_vertex = {"vertexID:vx:vy:vz:ntracks:chi2:ndof"};
   std::string str_event = {"event:seed:run:seg:job"};
   std::string str_hit = {"hitID:e:adc:layer:phielem:zelem:cellID:ecell:phibin:zbin:tbin:phi:r:x:y:z"};
-  std::string str_cluster = {"locx:locy:x:y:z:r:phi:eta:theta:phibin:tbin:fee:chan:sampa:ex:ey:ez:ephi:pez:pephi:e:adc:maxadc:thick:afac:bfac:dcal:layer:phielem:zelem:size:phisize:zsize:pedge:redge:ovlp:trackID:niter"};
+  std::string str_cluster = {"locx:locy:x:y:z:r:phi:eta:theta:phibin:tbin:fee:chan:sampa:ex:ey:ez:ephi:pez:pephi:e:adc:maxadc:cenadc:padcen:tbincen:padmax:tbinmax:thick:afac:bfac:dcal:layer:phielem:zelem:size:phisize:zsize:pedge:redge:sledge:sredge:tledge:tredge:dledge:dredge:hledge:hredge:slmix:srmix:tlmix:trmix:ovlp:phibinlo:phibinhi:tbinlo:tbinhi:padphase:tbinphase:trackID:niter"};
   std::string str_seed = {"seedID:siter:spt:sptot:seta:sphi:syxint:srzint:sxyslope:srzslope:sX0:sY0:sdZ0:sR0:scharge:sdedx:spidedx:skdedx:sprdedx:sn1pix:snsil:sntpc:snhits"};
   std::string str_residual = {"alpha:beta:resphio:resphi:resz"};
   std::string str_track = {"trackID:crossing:px:py:pz:pt:eta:phi:deltapt:deltaeta:deltaphi:charge:quality:chisq:ndf:nhits:nmaps:nintt:ntpc:nmms:ntpc1:ntpc11:ntpc2:ntpc3:dedx:pidedx:kdedx:prdedx:vertexID:vx:vy:vz:dca2d:dca2dsigma:dca3dxy:dca3dxysigma:dca3dz:dca3dzsigma:pcax:pcay:pcaz:hlxpt:hlxeta:hlxphi:hlxX0:hlxY0:hlxZ0:hlxcharge"};
@@ -1386,7 +1409,7 @@ void TrkrNtuplizer::fillOutputNtuples(PHCompositeNode* topNode)
   }
 
   //-----------------------
-  // fill the Vertex NTuple
+  // fill the Vertex NTuple and fixed NaN placeholders
   //-----------------------
   bool doit = true;
   if (_ntp_vertex && doit)
@@ -1397,35 +1420,56 @@ void TrkrNtuplizer::fillOutputNtuples(PHCompositeNode* topNode)
       std::cout << "start vertex time:                " << _timer->get_accumulated_time() / 1000. << " sec" << std::endl;
       _timer->restart();
     }
-    float fx_vertex[n_vertex::vtxsize];
-    for (float& i : fx_vertex)
+
+    SvtxVertexMap* vertexmap = findNode::getClass<SvtxVertexMap>(topNode, "SvtxVertexMapActs");
+
+    if (!vertexmap)
     {
-      i = 0;
+      std::cout << PHWHERE << " WARNING: SvtxVertexMapActs not found. Writing no vertex entries for this event." << std::endl;
     }
-
-    //    SvtxVertexMap* vertexmap = nullptr;
-
-    //    vertexmap = findNode::getClass<SvtxVertexMap>(topNode, "SvtxVertexMapActs");  // Acts vertices
-
-    float vx = std::numeric_limits<float>::quiet_NaN();
-    float vy = std::numeric_limits<float>::quiet_NaN();
-    float vz = std::numeric_limits<float>::quiet_NaN();
-    float ntracks = std::numeric_limits<float>::quiet_NaN();
-    fx_vertex[vtxnvx] = vx;
-    fx_vertex[vtxnvy] = vy;
-    fx_vertex[vtxnvz] = vz;
-    fx_vertex[vtxnntracks] = ntracks;
-    if (Verbosity() > 1)
+    else
     {
-      std::cout << " adding vertex data " << std::endl;
+      for (auto & iter : *vertexmap)
+      {
+        SvtxVertex* vertex = iter.second;
+        if (!vertex) { continue; }
+
+        float fx_vertex[n_vertex::vtxsize];
+        for (float& i : fx_vertex)
+        {
+          i = std::numeric_limits<float>::quiet_NaN();
+        }
+
+        fx_vertex[vtxnvertexID] = static_cast<float>(vertex->get_id());
+        fx_vertex[vtxnvx]       = vertex->get_x();
+        fx_vertex[vtxnvy]       = vertex->get_y();
+        fx_vertex[vtxnvz]       = vertex->get_z();
+        fx_vertex[vtxnntracks]  = static_cast<float>(vertex->size_tracks());
+        fx_vertex[vtxnchi2]     = vertex->get_chisq();
+        fx_vertex[vtxnndof]     = vertex->get_ndof();
+
+        if (Verbosity() > 1)
+        {
+          std::cout << " adding vertex data "
+                    << " id = " << vertex->get_id()
+                    << " vx = " << vertex->get_x()
+                    << " vy = " << vertex->get_y()
+                    << " vz = " << vertex->get_z()
+                    << " ntracks = " << vertex->size_tracks()
+                    << std::endl;
+        }
+
+        float* vertex_data = new float[((int) (n_info::infosize)) + n_event::evsize + n_vertex::vtxsize];
+        std::copy(fx_event, fx_event + n_event::evsize, vertex_data);
+        std::copy(fx_vertex, fx_vertex + n_vertex::vtxsize, vertex_data + n_event::evsize);
+        std::copy(fx_info, fx_info + ((int) (n_info::infosize)), vertex_data + n_event::evsize + n_vertex::vtxsize);
+
+        _ntp_vertex->Fill(vertex_data);
+        delete[] vertex_data;
+      }
     }
-    float* vertex_data = new float[((int) (n_info::infosize)) + n_event::evsize + n_vertex::vtxsize];
-    std::copy(fx_event, fx_event + n_event::evsize, vertex_data);
-    std::copy(fx_vertex, fx_vertex + n_vertex::vtxsize, vertex_data + n_event::evsize);
-    std::copy(fx_info, fx_info + ((int) (n_info::infosize)), vertex_data + n_event::evsize + n_vertex::vtxsize);
-    _ntp_vertex->Fill(vertex_data);
-    delete[] vertex_data;
   }
+
   if (Verbosity() > 1)
   {
     _timer->stop();
@@ -2260,6 +2304,11 @@ void TrkrNtuplizer::FillCluster(float fXcluster[n_cluster::clusize], TrkrDefs::c
   fXcluster[n_cluster::nclue] = cluster->getAdc();
   fXcluster[n_cluster::ncluadc] = cluster->getAdc();
   fXcluster[n_cluster::nclumaxadc] = cluster->getMaxAdc();
+  fXcluster[n_cluster::nclucenadc] = cluster->getCenAdc();
+  fXcluster[n_cluster::nclupadcen] = cluster->getPadCen();
+  fXcluster[n_cluster::nclutbincen] = cluster->getTBinCen();
+  fXcluster[n_cluster::nclupadmax] = cluster->getPadMax();
+  fXcluster[n_cluster::nclutbinmax] = cluster->getTBinMax();
   fXcluster[n_cluster::nclulayer] = layer_local;
 
   if (layer_local < 3)
@@ -2287,7 +2336,7 @@ void TrkrNtuplizer::FillCluster(float fXcluster[n_cluster::clusize], TrkrDefs::c
       }
       }
     */
-  fXcluster[n_cluster::nclusize] = cluster->getSize();
+  fXcluster[n_cluster::nclusize] = cluster->getRSize();
   fXcluster[n_cluster::ncluphisize] = cluster->getPhiSize();
   fXcluster[n_cluster::ncluzsize] = cluster->getZSize();
   fXcluster[n_cluster::nclupedge] = cluster->getEdge();
@@ -2297,8 +2346,25 @@ void TrkrNtuplizer::FillCluster(float fXcluster[n_cluster::clusize], TrkrDefs::c
   {
     fXcluster[n_cluster::ncluredge] = 1;
   }
-
-  fXcluster[n_cluster::ncluovlp] = 3;  // cluster->getOvlp();
+  fXcluster[n_cluster::nclusledge] = cluster->getSLEdge();
+  fXcluster[n_cluster::nclusredge] = cluster->getSREdge();
+  fXcluster[n_cluster::nclutledge] = cluster->getTLEdge();
+  fXcluster[n_cluster::nclutredge] = cluster->getTREdge();
+  fXcluster[n_cluster::ncludledge] = cluster->getDLEdge();
+  fXcluster[n_cluster::ncludredge] = cluster->getDREdge();
+  fXcluster[n_cluster::ncluhledge] = cluster->getHLEdge();
+  fXcluster[n_cluster::ncluhredge] = cluster->getHREdge();
+  fXcluster[n_cluster::ncluslmix] = cluster->getSLMix();
+  fXcluster[n_cluster::nclusrmix] = cluster->getSRMix();
+  fXcluster[n_cluster::nclutlmix] = cluster->getTLMix();
+  fXcluster[n_cluster::nclutrmix] = cluster->getTRMix();
+  fXcluster[n_cluster::ncluovlp] = cluster->getOverlap();
+  fXcluster[n_cluster::ncluphibinlo] = cluster->getPhiBinLo();
+  fXcluster[n_cluster::ncluphibinhi] = cluster->getPhiBinHi();
+  fXcluster[n_cluster::nclutbinlo] = cluster->getTBinLo();
+  fXcluster[n_cluster::nclutbinhi] = cluster->getTBinHi();
+  fXcluster[n_cluster::nclupadphase] = cluster->getPadPhase();
+  fXcluster[n_cluster::nclutbinphase] = cluster->getTBinPhase();
   fXcluster[n_cluster::nclutrackID] = std::numeric_limits<float>::quiet_NaN();
   fXcluster[n_cluster::ncluniter] = 0;
 

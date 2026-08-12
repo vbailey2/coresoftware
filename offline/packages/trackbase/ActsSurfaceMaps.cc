@@ -7,6 +7,7 @@
 #include "ActsSurfaceMaps.h"
 #include "InttDefs.h"
 #include "MvtxDefs.h"
+#include "TpcDefs.h"
 #include "TrkrCluster.h"
 
 #include <Acts/Definitions/Units.hpp>
@@ -32,6 +33,11 @@ namespace
 bool ActsSurfaceMaps::isTpcSurface(const Acts::Surface* surface) const
 {
   return m_tpcVolumeIds.find(surface->geometryId().volume()) != m_tpcVolumeIds.end();
+}
+
+bool ActsSurfaceMaps::isSiSurface(const Acts::Surface* surface) const
+{
+  return m_siVolumeIds.find(surface->geometryId().volume()) != m_siVolumeIds.end();
 }
 
 bool ActsSurfaceMaps::isMicromegasSurface(const Acts::Surface* surface) const
@@ -107,7 +113,7 @@ Surface ActsSurfaceMaps::getTpcSurface(TrkrDefs::hitsetkey hitsetkey,
 {
   unsigned int layer = TrkrDefs::getLayer(hitsetkey);
   const auto iter = m_tpcSurfaceMap.find(layer);
-
+   
   if (iter != m_tpcSurfaceMap.end())
   {
     auto surfvec = iter->second;

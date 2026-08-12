@@ -12,12 +12,12 @@
 #include <utility>  // for pair, make_pair
 
 CDBUtils::CDBUtils()
-  : cdbclient(new SphenixClient())
+  : cdbclient(std::make_unique<SphenixClient>())
 {
 }
 
 CDBUtils::CDBUtils(const std::string &globaltag)
-  : cdbclient(new SphenixClient(globaltag))
+  : cdbclient(std::make_unique<SphenixClient>(globaltag))
 {
 }
 
@@ -75,23 +75,39 @@ int CDBUtils::createPayloadType(const std::string &pt)
   return cdbclient->createDomain(pt);
 }
 
-void CDBUtils::listPayloadIOVs(uint64_t iov)
+std::map<std::string, std::tuple<std::string, uint64_t, uint64_t>> CDBUtils::PayloadIOVs(uint64_t iov, const std::string &ptype)
 {
+  std::map<std::string, std::tuple<std::string, uint64_t, uint64_t>> iovs;
   nlohmann::json resp = cdbclient->getPayloadIOVs(iov);
   if (resp["code"] != 0)
   {
     std::cout << resp["msg"] << std::endl;
-    return;
+    return iovs;
   }
   nlohmann::json payload_iovs = resp["msg"];
-  std::map<std::string, std::tuple<std::string, uint64_t, uint64_t>> iovs;
-  for (auto &[pt, val] : payload_iovs.items())
+  for (const auto &[pt, val] : payload_iovs.items())
   {
     std::string url = val["payload_url"];
     uint64_t bts = val["minor_iov_start"];
     uint64_t ets = val["minor_iov_end"];
-    iovs.insert(std::make_pair(pt, std::make_tuple(url, bts, ets)));
+    if (ets > iov)
+    {
+      if (!ptype.empty())
+      {
+        if (pt.find(ptype) == std::string::npos)
+        {
+          continue;
+        }
+      }
+      iovs.insert(std::make_pair(pt, std::make_tuple(url, bts, ets)));
+    }
   }
+  return iovs;
+}
+
+void CDBUtils::listPayloadIOVs(uint64_t iov, const std::string &ptype)
+{
+  auto iovs = PayloadIOVs(iov, ptype);
   for (const auto &it : iovs)
   {
     std::cout << it.first << ": " << std::get<0>(it.second)
@@ -107,7 +123,7 @@ int CDBUtils::cloneGlobalTag(const std::string &source, const std::string &targe
   nlohmann::json resp = cdbclient->getGlobalTags();
   nlohmann::json msgcont = resp["msg"];
   std::set<std::string> gtset;
-  for (auto &it : msgcont.items())
+  for (const auto &it : msgcont.items())
   {
     std::string exist_gt = it.value().at("name");
     gtset.insert(exist_gt);
@@ -133,7 +149,7 @@ void CDBUtils::listGlobalTags()
   nlohmann::json resp = cdbclient->getGlobalTags();
   nlohmann::json msgcont = resp["msg"];
   std::set<std::string> globaltags;
-  for (auto &it : msgcont.items())
+  for (const auto &it : msgcont.items())
   {
     std::string exist_gt = it.value().at("name");
     globaltags.insert(exist_gt);
@@ -150,7 +166,7 @@ void CDBUtils::listPayloadTypes()
   nlohmann::json resp = cdbclient->getPayloadTypes();
   nlohmann::json msgcont = resp["msg"];
   std::set<std::string> payloadtypes;
-  for (auto &it : msgcont.items())
+  for (const auto &it : msgcont.items())
   {
     std::string exist_pl = it.value().at("name");
     payloadtypes.insert(exist_pl);

@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 
@@ -51,6 +52,11 @@ nlohmann::json SphenixClient::getUrl(const std::string& pl_type, long long iov)
   return {{"code", 0}, {"msg", payloadurl}};
 }
 
+nlohmann::json SphenixClient::getUrlDict(long long major_iov, long long minor_iov)
+{
+  return nopayloadclient::NoPayloadClient::getUrlDict(major_iov, minor_iov);
+}
+
 nlohmann::json SphenixClient::getUrlDict(long long iov)
 {
   nlohmann::json resp = getPayloadIOVs(iov);
@@ -60,7 +66,7 @@ nlohmann::json SphenixClient::getUrlDict(long long iov)
   }
   for (auto it = resp["msg"].begin(); it != resp["msg"].end();)
   {
-    if (it.value()["minor_iov_end"] < iov)
+    if (it.value()["minor_iov_end"] <= iov)
     {
       it = resp["msg"].erase(it);
     }
@@ -69,11 +75,51 @@ nlohmann::json SphenixClient::getUrlDict(long long iov)
       ++it;
     }
   }
-  for (auto& piov : resp["msg"].items())
+  for (const auto& piov : resp["msg"].items())
   {
     piov.value() = piov.value()["payload_url"];
   }
   return resp;
+}
+
+void SphenixClient::DumpCalibrations(long long iov, const std::string& filename)
+{
+  nlohmann::json resp = getPayloadIOVs(iov);
+  if (resp["code"] != 0)
+  {
+    std::cout << "not writing " << filename << std::endl;
+    return;
+  }
+  for (auto it = resp["msg"].begin(); it != resp["msg"].end();)
+  {
+    if (it.value()["minor_iov_end"] <= iov)
+    {
+      it = resp["msg"].erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
+  std::ofstream dumpfile(filename);
+  if (dumpfile.is_open())
+  {
+    for (const auto& piov : resp["msg"].items())
+    {
+      std::string payload_url = piov.value()["payload_url"];
+      if (!payload_url.empty() && payload_url.front() == '"' && payload_url.back() == '"')
+      {
+        payload_url = payload_url.substr(1, payload_url.size() - 2);
+      }
+      dumpfile << piov.key() << " " << payload_url << std::endl;
+    }
+    dumpfile.close();
+  }
+  else
+  {
+    std::cout << "Could not open " << filename << std::endl;
+  }
+  return;
 }
 
 nlohmann::json SphenixClient::deletePayloadIOV(const std::string& pl_type, long long iov_start)
@@ -132,6 +178,13 @@ nlohmann::json SphenixClient::insertPayload(const std::string& pl_type, const st
   return nopayloadclient::NoPayloadClient::insertPayload(pl_type, file_url, 0, iov_start, 0, iov_end);
 }
 
+nlohmann::json SphenixClient::insertPayload(const std::string& pl_type, const std::string& file_url,
+                                            long long major_iov_start, long long minor_iov_start,
+                                            long long major_iov_end, long long minor_iov_end)
+{
+  return nopayloadclient::NoPayloadClient::insertPayload(pl_type, file_url, major_iov_start, minor_iov_start, major_iov_end, minor_iov_end);
+}
+
 nlohmann::json SphenixClient::setGlobalTag(const std::string& gt_name)
 {
   if (m_CachedGlobalTag == gt_name)
@@ -162,7 +215,7 @@ int SphenixClient::cache_set_GlobalTag(const std::string& tagname)
   bool found_gt = false;
   nlohmann::json resp = nopayloadclient::NoPayloadClient::getGlobalTags();
   nlohmann::json msgcont = resp["msg"];
-  for (auto& it : msgcont.items())
+  for (const auto& it : msgcont.items())
   {
     std::string exist_gt = it.value().at("name");
     std::cout << "global tag: " << exist_gt << std::endl;
@@ -196,7 +249,7 @@ int SphenixClient::createDomain(const std::string& domain)
   {
     resp = nopayloadclient::NoPayloadClient::getPayloadTypes();
     nlohmann::json msgcont = resp["msg"];
-    for (auto& it : msgcont.items())
+    for (const auto& it : msgcont.items())
     {
       std::string existent_domain = it.value().at("name");
       m_DomainCache.insert(existent_domain);
@@ -235,7 +288,7 @@ bool SphenixClient::existGlobalTag(const std::string& gt_name)
   }
   nlohmann::json resp = nopayloadclient::NoPayloadClient::getGlobalTags();
   nlohmann::json msgcont = resp["msg"];
-  for (auto& it : msgcont.items())
+  for (const auto& it : msgcont.items())
   {
     std::string exist_gt = it.value().at("name");
     m_GlobalTagCache.insert(gt_name);

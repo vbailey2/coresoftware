@@ -79,6 +79,7 @@ pkginclude_HEADERS = \
   PHG4DetectorSubsystem.h \
   PHG4DetectorGroupSubsystem.h \
   PHG4FullProjSpacalCellReco.h \
+  PHG4GeantinoIonization.h \
   PHG4GDMLSubsystem.h \
   PHG4HcalDefs.h \
   PHG4HcalCellReco.h \
@@ -100,6 +101,7 @@ pkginclude_HEADERS = \
   PHG4TpcCylinderGeomContainer.h \
   PHG4TpcGeom.h \
   PHG4TpcGeomv1.h \
+  PHG4TpcGeomv2.h \
   PHG4TpcGeomContainer.h \
   PHG4ZDCDefs.h \
   PHG4ZDCSubsystem.h
@@ -137,6 +139,7 @@ ROOTDICTS = \
   PHG4TpcCylinderGeomContainer_Dict.cc \
   PHG4TpcGeom_Dict.cc \
   PHG4TpcGeomv1_Dict.cc \
+  PHG4TpcGeomv2_Dict.cc \
   PHG4TpcGeomContainer_Dict.cc 
 
 pcmdir = $(libdir)
@@ -177,6 +180,7 @@ libg4detectors_io_la_SOURCES = \
   PHG4TpcCylinderGeomContainer.cc \
   PHG4TpcGeom.cc \
   PHG4TpcGeomv1.cc \
+  PHG4TpcGeomv2.cc \
   PHG4TpcGeomContainer.cc 
 
 libg4detectors_la_SOURCES = \
@@ -219,6 +223,7 @@ libg4detectors_la_SOURCES = \
   PHG4FullProjSpacalDetector.cc \
   PHG4FullProjTiltedSpacalDetector.cc \
   PHG4FullProjSpacalCellReco.cc \
+  PHG4GeantinoIonization.cc \
   PHG4GenHit.cc \
   PHG4HcalCellReco.cc \
   PHG4HcalDetector.cc \

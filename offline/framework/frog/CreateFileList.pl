@@ -35,13 +35,15 @@ my %exclude_these = (
     "DST_JOBA" => "Test PanDa",
     "DST_MDC2_GLOBAL" => "Test PanDa",
     "DST_PASS1_CLUSTERS" => "Test PanDa",
-    "DST_RECO_CLUSTER" => "Test PanDa"
+    "DST_RECO_CLUSTER" => "Test PanDa",
+    "DST_CALO_NOZERO" => "obsolete",
+    "DST_CALO_WAVEFORM" => "obsolete"
     );
 
 my %proddesc = (
 #    "1" => "hijing (0-12fm) pileup 0-12fm DELETED",
 #    "2" => "hijing (0-4.88fm) pileup 0-12fm DELETED",
-    "3" => "pythia8 pp MB",
+#    "3" => "pythia8 pp MB",
     "4" => "hijing (0-20fm) pileup 0-20fm",
 #    "5" => "hijing (0-12fm) pileup 0-20fm DELETED",
     "6" => "hijing (0-4.88fm) pileup 0-20fm",
@@ -49,39 +51,53 @@ my %proddesc = (
     "8" => "HF pythia8 Bottom",
     "9" => "HF pythia8 Charm D0",
     "10" => "HF pythia8 Bottom D0",
-    "11" => "JS pythia8 Jet ptmin = 30GeV",
-    "12" => "JS pythia8 Jet ptmin = 10GeV",
+    "11" => "JS pythia8 Jet ptmin = 30 GeV",
+    "12" => "JS pythia8 Jet ptmin = 10 GeV",
     "13" => "JS pythia8 Photon Jet",
     "14" => "Single Particles",
     "15" => "Special Productions",
     "16" => "HF pythia8 D0 Jets",
-    "17" => "HF pythia8 D0 pi-k Jets ptmin = 5GeV ",
-    "18" => "HF pythia8 D0 pi-k Jets ptmin = 12GeV",
-    "19" => "JS pythia8 Jet ptmin = 40GeV",
+    "17" => "HF pythia8 D0 pi-k Jets ptmin = 5 GeV ",
+    "18" => "HF pythia8 D0 pi-k Jets ptmin = 12 GeV",
+    "19" => "JS pythia8 Jet ptmin = 40 GeV",
     "20" => "hijing pAu (0-10fm) pileup 0-10fm",
-    "21" => "JS pythia8 Jet ptmin = 20GeV",
+    "21" => "JS pythia8 Jet ptmin = 20 GeV",
     "22" => "cosmic field on",
     "23" => "cosmic field off",
     "24" => "AMPT",
     "25" => "EPOS",
     "26" => "JS pythia8 Detroit (MB)",
-    "27" => "JS pythia8 Photonjet ptmin = 5GeV",
-    "28" => "JS pythia8 Photonjet ptmin = 10GeV",
-    "29" => "JS pythia8 Photonjet ptmin = 20GeV",
+    "27" => "JS pythia8 Photonjet ptmin = 5 GeV",
+    "28" => "JS pythia8 Photonjet ptmin = 10 GeV",
+    "29" => "JS pythia8 Photonjet ptmin = 20 GeV",
     "30" => "Herwig MB",
     "31" => "Herwig Jet ptmin = 10 GeV",
     "32" => "Herwig Jet ptmin = 30 GeV",
-    "33" => "JS pythia8 Jet ptmin = 15GeV",
-    "34" => "JS pythia8 Jet ptmin = 50GeV",
-    "35" => "JS pythia8 Jet ptmin = 70GeV",
-    "36" => "JS pythia8 Jet ptmin = 5GeV",
+    "33" => "JS pythia8 Jet ptmin = 15 GeV",
+    "34" => "JS pythia8 Jet ptmin = 50 GeV",
+    "35" => "JS pythia8 Jet ptmin = 70 GeV",
+    "36" => "JS pythia8 Jet ptmin = 5 GeV",
     "37" => "hijing O+O (0-15fm)",
-    "38" => "JS pythia8 Jet ptmin = 60GeV",
-    "39" => "JS pythia8 Jet ptmin = 12GeV"
+    "38" => "JS pythia8 Jet ptmin = 60 GeV",
+    "39" => "JS pythia8 Jet ptmin = 12 GeV",
+    "40" => "Herwig Jet ptmin = 5 GeV",
+    "41" => "Herwig Jet ptmin = 12 GeV",
+    "42" => "Herwig Jet ptmin = 20 GeV",
+    "43" => "Herwig Jet ptmin = 40 GeV",
+    "44" => "Herwig Jet ptmin = 50 GeV",
+    "45" => "Herwig Photonjet ptmin = 5 GeV",
+    "46" => "Herwig Photonjet ptmin = 10 GeV",
+    "47" => "Herwig Photonjet ptmin = 20 GeV",
+    "48" => "JS pythia8 Jet ptmin = 8 GeV",
+    "49" => "JS pythia8 Jet ptmin = 80 GeV",
+    "50" => "JS pythia8 Detroit eta ptmin = 3 GeV",
+    "51" => "JS pythia8 Detroit eta ptmin = 8 GeV",
+    "52" => "JS pythia8 Jet ptmin = 3 GeV",
+    "53" => "JS pythia8 Photonjet ptmin = 3 GeV"
     );
 
 my %pileupdesc = (
-    "1" => "50kHz for Au+Au, 3MHz for p+p (default)",
+    "1" => "50kHz for Au+Au, 3MHz for p+p, 220kHz for O+O (default)",
     "2" => "25kHz for Au+Au",
     "3" => "10kHz for Au+Au",
     "4" => "1MHz for pp 100us streaming",
@@ -105,6 +121,7 @@ my $pmin;
 my $pmax;
 my $production;
 my $momentum;
+my $double;
 # that should teach me a lesson to not give a flag an optional string value
 # just using embed:s leads to the next ARGV to be used as argument, even if it
 # is the next option. Sadly getopt swallows the - so parsing this becomes
@@ -129,7 +146,7 @@ foreach my $argument (@ARGV)
 	else
 	{
 	    push(@newargs, $argument);
-	    if ($ARGV[$iarg+1] ne "pau" && $ARGV[$iarg+1] ne "auau" && $ARGV[$iarg+1] ne "central")
+	    if ($ARGV[$iarg+1] ne "pau" && $ARGV[$iarg+1] ne "auau" && $ARGV[$iarg+1] ne "central" && $ARGV[$iarg+1] ne "oo" )
 	    {
 		push(@newargs,"auau");
 	    }
@@ -142,7 +159,7 @@ foreach my $argument (@ARGV)
     $iarg++;
 }
 @ARGV=@newargs;
-GetOptions('embed:s' => \$embed, 'l:i' => \$last_segment, 'momentum:s' => \$momentum, 'n:i' => \$nEvents, "nobkgpileup" => \$nobkgpileup, "nopileup" => \$nopileup, "particle:s" => \$particle, 'pileup:i' => \$pileup, "pmin:i" => \$pmin, "pmax:i"=>\$pmax, "production:s"=>\$production, 'rand' => \$randomize, 'run:i' => \$runnumber, 's:i' => \$start_segment, 'type:i' =>\$prodtype, "verbose" =>\$verbose);
+GetOptions('double' => \$double, 'embed:s' => \$embed, 'l:i' => \$last_segment, 'momentum:s' => \$momentum, 'n:i' => \$nEvents, "nobkgpileup" => \$nobkgpileup, "nopileup" => \$nopileup, "particle:s" => \$particle, 'pileup:i' => \$pileup, "pmin:i" => \$pmin, "pmax:i"=>\$pmax, "production:s"=>\$production, 'rand' => \$randomize, 'run:i' => \$runnumber, 's:i' => \$start_segment, 'type:i' =>\$prodtype, "verbose" =>\$verbose);
 my $filenamestring;
 my %filetypes = ();
 my %notlike = ();
@@ -177,6 +194,7 @@ if ($pileup == 1)
     $AuAu_pileupstring = sprintf("_50kHz%s",$AuAu_bkgpileup);
     $pp_pileupstring = sprintf("_3MHz");
     $pAu_pileupstring = sprintf("_500kHz%s",$pAu_bkgpileup);
+    $OO_pileupstring = sprintf("_220kHz%s",$OO_bkgpileup);
 }
 elsif ($pileup == 2)
 {
@@ -208,6 +226,7 @@ if (defined $nobkgpileup)
 }
 
 my $embedok = 0;
+my $doubleok = 0;
 
 if (defined $prodtype)
 {
@@ -309,6 +328,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Jet30";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -320,6 +344,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -349,6 +377,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -504,6 +536,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Jet40";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -515,6 +552,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -547,6 +588,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Jet20";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -558,6 +604,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -618,6 +668,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Detroit";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -647,6 +702,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_PhotonJet5";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -658,6 +718,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -676,6 +740,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_PhotonJet10";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = "pythia8_PhotonJet10_pythia8_Detroit";
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -687,6 +756,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -705,6 +778,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_PhotonJet20";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -716,6 +794,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -833,6 +915,10 @@ if (defined $prodtype)
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
 		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
 		else
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
@@ -850,6 +936,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Jet50";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -861,6 +952,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -891,6 +986,10 @@ if (defined $prodtype)
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
 		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
 		else
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
@@ -908,6 +1007,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Jet5";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -919,6 +1023,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -951,6 +1059,11 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Jet60";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -962,6 +1075,10 @@ if (defined $prodtype)
 		elsif ($embed eq "central")
 		{
 		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
 		}
 		else
 		{
@@ -980,6 +1097,44 @@ if (defined $prodtype)
     {
         $embedok = 1;
 	$filenamestring = "pythia8_Jet12";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 40)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_Jet5";
 	if (! defined $nopileup)
 	{
 	    if (defined $embed)
@@ -1005,7 +1160,456 @@ if (defined $prodtype)
         $pileupstring = $pp_pileupstring;
 	&commonfiletypes();
     }
-
+    elsif ($prodtype == 41)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_Jet12";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 42)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_Jet20";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 43)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_Jet40";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 44)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_Jet50";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 45)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_PhotonJet5";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 45)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_PhotonJet5";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 46)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_PhotonJet10";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 47)
+    {
+        $embedok = 1;
+	$filenamestring = "Herwig_PhotonJet20";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 48)
+    {
+        $embedok = 1;
+	$filenamestring = "pythia8_Jet8";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 49)
+    {
+        $embedok = 1;
+	$filenamestring = "pythia8_Jet80";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 50)
+    {
+        $embedok = 1;
+	$filenamestring = "pythia8_Eta3";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 51)
+    {
+        $embedok = 1;
+	$filenamestring = "pythia8_Eta8";
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 52)
+    {
+        $embedok = 1;
+	$filenamestring = "pythia8_Jet3";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
+    elsif ($prodtype == 53)
+    {
+        $embedok = 1;
+	$filenamestring = "pythia8_PhotonJet3";
+	if (defined $double)
+	{
+	    $doubleok = 1;
+	    $filenamestring = sprintf("%s_pythia8_Detroit",$filenamestring);
+	}
+	if (! defined $nopileup)
+	{
+	    if (defined $embed)
+	    {
+		if ($embed eq "pau")
+		{
+		    $filenamestring = sprintf("%s_sHijing_pAu_0_10fm%s",$filenamestring, $pAu_pileupstring);
+		}
+		elsif ($embed eq "central")
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_488fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+		elsif ($embed eq "oo")
+		{
+		    $filenamestring = sprintf("%s_sHijing_OO_0_15fm%s",$filenamestring, $OO_pileupstring);
+		}
+		else
+		{
+		    $filenamestring = sprintf("%s_sHijing_0_20fm%s",$filenamestring, $AuAu_pileupstring);
+		}
+	    }
+	    else
+	    {
+		$filenamestring = sprintf("%s%s",$filenamestring,$pp_pileupstring);
+	    }
+	}
+        $pileupstring = $pp_pileupstring;
+	&commonfiletypes();
+    }
     else
     {
 	print "no production type $prodtype\n";
@@ -1019,6 +1623,11 @@ if (defined $embed && ! $embedok)
     print "Embedding not implemented for type $prodtype\n";
     exit(1);
 }
+if (defined $double && ! $doubleok)
+{
+    print "Double interactions not implemented for type $prodtype\n";
+    exit(1);
+}
 
 my $filenamestring_with_runnumber = sprintf("%s\-%010d-",$filenamestring,$runnumber);
 if ($#ARGV < 0)
@@ -1027,6 +1636,7 @@ if ($#ARGV < 0)
     {
 	print "usage: CreateFileLists.pl -type <production type> <filetypes>\n";
 	print "parameters:\n";
+	print "-double : double interactions, pp of your type and Detroit pp\n";
 	print "-embed : pp embedded into MB AuAu hijing (only for pp types)\n";
 	print "  -embed pau : embedded into pAu (only for pp types)\n";
 	print "  -embed central : embedded into central AuAu\n";
@@ -1150,6 +1760,10 @@ while($#ARGV >= 0)
 }
 print "This Can Take a While (10 minutes depending on the amount of events and the number of file types you want)\n";
 my $conds = sprintf("dsttype = ? and filename like \'\%%%s\%\'",$filenamestring_with_runnumber);
+if (! defined $double)
+{
+    $conds = sprintf("%s and filename not like '\%%pythia8_\%_pythia8\%'",$conds);
+}
 
 if (exists $notlike{$filenamestring})
 {

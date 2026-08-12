@@ -11,7 +11,7 @@
 #include <Acts/EventData/TrackParameters.hpp>
 #include <Acts/EventData/VectorTrackContainer.hpp>
 #include <Acts/Geometry/TrackingGeometry.hpp>
-
+#include <ActsExamples/EventData/Measurement.hpp>
 #pragma GCC diagnostic push // needed for local Act compilation
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #include <Acts/Propagator/MultiEigenStepperLoop.hpp>
@@ -27,13 +27,29 @@ namespace Acts
 {
   class TrackingGeometry;
 }
+struct MaterialSurfaceSelector
+  {
+    std::vector<const Acts::Surface*> surfaces = {};
+
+    /// @param surface is the test surface
+    void operator()(const Acts::Surface* surface)
+    {
+      if (surface->surfaceMaterial() != nullptr)
+      {
+        if (std::find(surfaces.begin(), surfaces.end(), surface) ==
+            surfaces.end())
+        {
+          surfaces.push_back(surface);
+        }
+      }
+    }
+  };
 
 class ActsTrackFittingAlgorithm final
 {
  public:
   using TrackParameters = ::Acts::BoundTrackParameters;
-  using Measurement = ::Acts::BoundVariantMeasurement;
-  using MeasurementContainer = std::vector<Measurement>;
+  using MeasurementContainer = ActsExamples::MeasurementContainer;
 
   using TrackContainer =
       Acts::TrackContainer<Acts::VectorTrackContainer,

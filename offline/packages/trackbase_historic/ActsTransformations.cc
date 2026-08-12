@@ -286,7 +286,7 @@ void ActsTransformations::calculateDCA(const Acts::BoundTrackParameters& param,
 }
 
 void ActsTransformations::fillSvtxTrackStates(
-  const Acts::ConstVectorMultiTrajectory& traj,
+  const Acts::VectorMultiTrajectory& traj,
   const size_t& trackTip,
   SvtxTrack* svtxTrack,
   const Acts::GeometryContext& geoContext) const
@@ -295,32 +295,32 @@ void ActsTransformations::fillSvtxTrackStates(
   {
 
     /// Only fill the track states with non-outlier measurement
-    const auto typeFlags = state.typeFlags();
-    if( !typeFlags.test(Acts::TrackStateFlag::MeasurementFlag) )
+    if (!state.typeFlags().isMeasurement())
     { return true; }
 
     // only fill for state vectors with proper smoothed parameters
-    if( !state.hasSmoothed()) { return true;
-  }
+    if( !state.hasSmoothed()) { return true;  }
 
-  // create svtx state vector with relevant pathlength
-  const float pathlength = state.pathLength() / Acts::UnitConstants::cm;
+    // create svtx state vector with relevant pathlength
+    const float pathlength = state.pathLength() / Acts::UnitConstants::cm;
 
-  // get smoothed fitted parameters
-  const Acts::BoundTrackParameters params(
-    state.referenceSurface().getSharedPtr(),
-    state.smoothed(),
-    state.smoothedCovariance(),
-    Acts::ParticleHypothesis::pion());
+    // get smoothed fitted parameters
+    const Acts::BoundTrackParameters params(
+      state.referenceSurface().getSharedPtr(),
+      state.smoothed(),
+      state.smoothedCovariance(),
+      Acts::ParticleHypothesis::pion());
 
-  // get source link and key
-  const auto sourceLink = state.getUncalibratedSourceLink().template get<ActsSourceLink>();
-  const auto key = sourceLink.cluskey();
+    // get source link and key
+    const auto sourceLink = state.getUncalibratedSourceLink().template get<ActsSourceLink>();
+    const auto key = sourceLink.cluskey();
 
-  // add track state
-  addTrackState( svtxTrack,key,pathlength,params, geoContext );
+    // add track state
+    addTrackState( svtxTrack,key,pathlength,params, geoContext );
 
-  return true; });
+    return true;
+  });
+
 }
 
 //_______________________________________________________________________________________________________

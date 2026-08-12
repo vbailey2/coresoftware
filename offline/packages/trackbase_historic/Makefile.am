@@ -16,9 +16,9 @@ AM_CPPFLAGS = \
 
 AM_LDFLAGS = \
   -L$(libdir) \
-  -L$(ROOTSYS)/lib \
   -L$(OFFLINE_MAIN)/lib \
-  -L$(OFFLINE_MAIN)/lib64
+  -L$(OFFLINE_MAIN)/lib64 \
+  -L$(ROOTSYS)/lib
 
 pkginclude_HEADERS = \
   ActsTransformations.h \
@@ -41,6 +41,7 @@ pkginclude_HEADERS = \
   SvtxTrack_v2.h \
   SvtxTrack_v3.h \
   SvtxTrack_v4.h \
+  SvtxTrack_v5.h \
   SvtxTrack_FastSim.h \
   SvtxTrack_FastSim_v1.h \
   SvtxTrack_FastSim_v2.h \
@@ -98,6 +99,7 @@ ROOTDICTS = \
   SvtxTrack_v2_Dict.cc \
   SvtxTrack_v3_Dict.cc \
   SvtxTrack_v4_Dict.cc \
+  SvtxTrack_v5_Dict.cc \
   SvtxTrack_FastSim_Dict.cc \
   SvtxTrack_FastSim_v1_Dict.cc \
   SvtxTrack_FastSim_v2_Dict.cc \
@@ -158,6 +160,7 @@ libtrackbase_historic_io_la_SOURCES = \
   SvtxTrack_v2.cc \
   SvtxTrack_v3.cc \
   SvtxTrack_v4.cc \
+  SvtxTrack_v5.cc \
   SvtxTrack_FastSim.cc \
   SvtxTrack_FastSim_v1.cc \
   SvtxTrack_FastSim_v2.cc \
@@ -179,11 +182,6 @@ libtrackbase_historic_io_la_SOURCES = \
   WeightedTrack.cc \
   WeightedTrackZeroField.cc \
   WeightedTrackMap.cc
-
-AM_LDFLAGS = \
-  -L$(libdir) \
-  -L$(OFFLINE_MAIN)/lib \
-  -L$(OFFLINE_MAIN)/lib64
 
 # dependency on libtrack.so breaks the io only library concept
 libtrackbase_historic_io_la_LIBADD = \

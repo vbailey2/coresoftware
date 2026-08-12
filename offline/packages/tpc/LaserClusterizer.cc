@@ -5,12 +5,13 @@
 #include <trackbase/LaserCluster.h>
 #include <trackbase/LaserClusterContainer.h>
 #include <trackbase/LaserClusterContainerv1.h>
-#include <trackbase/LaserClusterv2.h>
+#include <trackbase/LaserClusterv3.h>
 #include <trackbase/TpcDefs.h>
 #include <trackbase/TrkrDefs.h>  // for hitkey, getLayer
 #include <trackbase/TrkrHit.h>
 #include <trackbase/TrkrHitSet.h>
 #include <trackbase/TrkrHitSetContainer.h>
+#include <trackbase/alignmentTransformationContainer.h>
 
 #include <ffaobjects/EventHeader.h>
 #include <fun4all/Fun4AllReturnCodes.h>
@@ -60,7 +61,7 @@
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
-using point = bg::model::point<float, 3, bg::cs::cartesian>;
+using point = bg::model::point<double, 3, bg::cs::cartesian>;
 using box = bg::model::box<point>;
 using specHitKey = std::pair<TrkrDefs::hitkey, TrkrDefs::hitsetkey>;
 using adcKey = std::pair<unsigned int, specHitKey>;
@@ -319,16 +320,16 @@ namespace
 
       while (!q.empty())
       {
-        float ix = q.front().first.get<0>();
-        float iy = q.front().first.get<1>();
-        float iz = q.front().first.get<2>();
+        double ix = q.front().first.get<0>();
+        double iy = q.front().first.get<1>();
+        double iz = q.front().first.get<2>();
         q.pop();
 
         for (auto neigh : neighborOffsets)
         {
-          float nx = ix + neigh.get<0>();
-          float ny = iy + neigh.get<1>();
-          float nz = iz + neigh.get<2>();
+          double nx = ix + neigh.get<0>();
+          double ny = iy + neigh.get<1>();
+          double nz = iz + neigh.get<2>();
 
           for (unsigned int v = 0; v < unvisited.size(); v++)
           {
@@ -430,10 +431,12 @@ namespace
   void calc_cluster_parameter(std::vector<hitData> &clusHits, thread_data &my_data, std::pair<TrkrDefs::hitkey, TrkrDefs::hitsetkey> maxADCKey)
   {
     findConnectedRegions3(clusHits, maxADCKey, my_data.Verbosity);
-
-    double rSum = 0.0;
-    double phiSum = 0.0;
-    double tSum = 0.0;
+    
+    unsigned int nHits = clusHits.size();
+    if(nHits == 0)
+    {
+      return;
+    }
 
     double layerSum = 0.0;
     double iphiSum = 0.0;
@@ -443,26 +446,26 @@ namespace
 
     double maxAdc = 0.0;
     TrkrDefs::hitsetkey maxKey = 0;
+    //double secondmaxAdc = 0.0;
+    //TrkrDefs::hitsetkey secondmaxKey = 0;
 
-    unsigned int nHits = clusHits.size();
-
-    auto *clus = new LaserClusterv2;
+    auto *clus = new LaserClusterv3;
 
     int meanSide = 0;
 
-    std::vector<float> usedLayer;
-    std::vector<float> usedIPhi;
-    std::vector<float> usedIT;
+    std::vector<int> usedLayer;
+    std::vector<int> usedIPhi;
+    std::vector<int> usedIT;
 
-    double meanLayer = 0.0;
-    double meanIPhi = 0.0;
-    double meanIT = 0.0;
+    float meanLayer = 0.0;
+    float meanIPhi = 0.0;
+    float meanIT = 0.0;
 
     for (auto &clusHit : clusHits)
     {
-      float coords[3] = {clusHit.first.get<0>(), clusHit.first.get<1>(), clusHit.first.get<2>()};
+      int coords[3] = {(int)clusHit.first.get<0>(), (int)clusHit.first.get<1>(), (int)clusHit.first.get<2>()};
       std::pair<TrkrDefs::hitkey, TrkrDefs::hitsetkey> spechitkey = clusHit.second.second;
-      unsigned int adc = clusHit.second.first;
+      uint16_t adc = clusHit.second.first;
 
       int side = TpcDefs::getSide(spechitkey.second);
 
@@ -475,17 +478,8 @@ namespace
         meanSide--;
       }
 
-      PHG4TpcGeom *layergeom = my_data.geom_container->GetLayerCellGeom((int) coords[0]);
-
-      double r = layergeom->get_radius();
-      double phi = layergeom->get_phi(coords[1], side);
-      double t = layergeom->get_zcenter(fabs(coords[2]));
-
-      double hitzdriftlength = t * my_data.tGeometry->get_drift_velocity();
-      double hitZ = my_data.tdriftmax * my_data.tGeometry->get_drift_velocity() - hitzdriftlength;
-
       bool foundLayer = false;
-      for (float i : usedLayer)
+      for (int i : usedLayer)
       {
         if (coords[0] == i)
         {
@@ -500,7 +494,7 @@ namespace
       }
 
       bool foundIPhi = false;
-      for (float i : usedIPhi)
+      for (int i : usedIPhi)
       {
         if (coords[1] == i)
         {
@@ -515,7 +509,7 @@ namespace
       }
 
       bool foundIT = false;
-      for (float i : usedIT)
+      for (int i : usedIT)
       {
         if (coords[2] == i)
         {
@@ -529,56 +523,38 @@ namespace
         usedIT.push_back(coords[2]);
       }
 
-      clus->addHit();
-      clus->setHitLayer(clus->getNhits() - 1, coords[0]);
-      clus->setHitIPhi(clus->getNhits() - 1, coords[1]);
-      clus->setHitIT(clus->getNhits() - 1, coords[2]);
-      clus->setHitX(clus->getNhits() - 1, r * cos(phi));
-      clus->setHitY(clus->getNhits() - 1, r * sin(phi));
-      clus->setHitZ(clus->getNhits() - 1, hitZ);
-      clus->setHitAdc(clus->getNhits() - 1, (float) adc);
+      clus->addHit(spechitkey.second, spechitkey.first, adc);
 
-      rSum += r * adc;
-      phiSum += phi * adc;
-      tSum += t * adc;
+      layerSum += 1.0 * coords[0] * adc;
+      iphiSum += 1.0 * coords[1] * adc;
+      itSum += 1.0 * coords[2] * adc;
 
-      layerSum += coords[0] * adc;
-      iphiSum += coords[1] * adc;
-      itSum += coords[2] * adc;
+      meanLayer += 1.0 * coords[0];
+      meanIPhi += 1.0 * coords[1];
+      meanIT += 1.0 * coords[2];
 
-      meanLayer += coords[0];
-      meanIPhi += coords[1];
-      meanIT += coords[2];
+      adcSum += 1.0*adc;
 
-      adcSum += adc;
-
-      if (adc > maxAdc)
+      if (1.0*adc > maxAdc)
       {
+        //secondmaxAdc = maxAdc;
+        //secondmaxKey = maxKey;
         maxAdc = adc;
         maxKey = spechitkey.second;
       }
-    }
-
-    if (nHits == 0)
-    {
-      return;
-    }
-
-    double clusR = rSum / adcSum;
-    double clusPhi = phiSum / adcSum;
-    double clusT = tSum / adcSum;
-    double zdriftlength = clusT * my_data.tGeometry->get_drift_velocity();
-
-    double clusX = clusR * cos(clusPhi);
-    double clusY = clusR * sin(clusPhi);
-    double clusZ = my_data.tdriftmax * my_data.tGeometry->get_drift_velocity() - zdriftlength;
-    if (meanSide < 0)
-    {
-      clusZ = -clusZ;
-      for (int i = 0; i < (int) clus->getNhits(); i++)
+      //else if (1.0*adc > secondmaxAdc)
       {
-        clus->setHitZ(i, -1 * clus->getHitZ(i));
+        //secondmaxAdc = adc;
+        //secondmaxKey = spechitkey.second;
       }
+
+
+    }
+
+    if (nHits == 0 || clus->getNhits() == 0)
+    {
+      delete clus;
+      return;
     }
 
     std::sort(usedLayer.begin(), usedLayer.end());
@@ -597,29 +573,54 @@ namespace
     double sigmaWeightedIPhi = 0.0;
     double sigmaWeightedIT = 0.0;
 
-    pthread_mutex_lock(&mythreadlock);
-    my_data.hitHist = new TH3D(std::format("hitHist_event{}_side{}_sector{}_module{}_cluster{}", my_data.eventNum, (int) my_data.side, (int) my_data.sector, (int) my_data.module, (int) my_data.cluster_vector.size()).c_str(), ";layer;iphi;it", usedLayer.size() + 2, usedLayer[0] - 1.5, *usedLayer.rbegin() + 1.5, usedIPhi.size() + 2, usedIPhi[0] - 1.5, *usedIPhi.rbegin() + 1.5, usedIT.size() + 2, usedIT[0] - 1.5, *usedIT.rbegin() + 1.5);
-
-    // TH3D *hitHist = new TH3D(Form("hitHist_event%d_side%d_sector%d_module%d_cluster%d",my_data.eventNum,(int)my_data.side,(int)my_data.sector,(int)my_data.module,(int)my_data.cluster_vector.size()),";layer;iphi;it",usedLayer.size()+2,usedLayer[0]-1.5,*usedLayer.rbegin()+1.5,usedIPhi.size()+2,usedIPhi[0]-1.5,*usedIPhi.rbegin()+1.5,usedIT.size()+2,usedIT[0]-1.5,*usedIT.rbegin()+1.5);
-
     for (int i = 0; i < (int) clus->getNhits(); i++)
     {
-      my_data.hitHist->Fill(clus->getHitLayer(i), clus->getHitIPhi(i), clus->getHitIT(i), clus->getHitAdc(i));
+      LaserClusterHitInfo LCHI = clus->getHit(i);
+      uint8_t layer = TrkrDefs::getLayer(LCHI.hitsetkey);
+      uint16_t iphi = TpcDefs::getPad(LCHI.hitkey);
+      uint16_t it = TpcDefs::getTBin(LCHI.hitkey);
 
-      sigmaLayer += pow(clus->getHitLayer(i) - meanLayer, 2);
-      sigmaIPhi += pow(clus->getHitIPhi(i) - meanIPhi, 2);
-      sigmaIT += pow(clus->getHitIT(i) - meanIT, 2);
+      sigmaLayer += pow(layer - meanLayer, 2);
+      sigmaIPhi += pow(iphi - meanIPhi, 2);
+      sigmaIT += pow(it - meanIT, 2);
 
-      sigmaWeightedLayer += clus->getHitAdc(i) * pow(clus->getHitLayer(i) - (layerSum / adcSum), 2);
-      sigmaWeightedIPhi += clus->getHitAdc(i) * pow(clus->getHitIPhi(i) - (iphiSum / adcSum), 2);
-      sigmaWeightedIT += clus->getHitAdc(i) * pow(clus->getHitIT(i) - (itSum / adcSum), 2);
+      sigmaWeightedLayer += LCHI.adc * pow(layer - (layerSum / adcSum), 2);
+      sigmaWeightedIPhi += LCHI.adc * pow(iphi - (iphiSum / adcSum), 2);
+      sigmaWeightedIT += LCHI.adc * pow(it - (itSum / adcSum), 2);
     }
 
-    bool fitSuccess = false;
-    ROOT::Fit::Fitter *fit3D = new ROOT::Fit::Fitter;
+    clus->setNLayers(usedLayer.size());
+    clus->setNIPhi(usedIPhi.size());
+    clus->setNIT(usedIT.size());
+    clus->setLayer(layerSum / adcSum);
+    clus->setIPhi(iphiSum / adcSum);
+    clus->setIT(itSum / adcSum);
+    clus->setSDLayer(sqrt(sigmaLayer / nHits));
+    clus->setSDIPhi(sqrt(sigmaIPhi / nHits));
+    clus->setSDIT(sqrt(sigmaIT / nHits));
+    clus->setSDWeightedLayer(sqrt(sigmaWeightedLayer / adcSum));
+    clus->setSDWeightedIPhi(sqrt(sigmaWeightedIPhi / adcSum));
+    clus->setSDWeightedIT(sqrt(sigmaWeightedIT / adcSum));
 
     if (my_data.doFitting)
     {
+      pthread_mutex_lock(&mythreadlock);
+      my_data.hitHist = new TH3D(std::format("hitHist_event{}_side{}_sector{}_module{}_cluster{}", my_data.eventNum, (int) my_data.side, (int) my_data.sector, (int) my_data.module, (int) my_data.cluster_vector.size()).c_str(), ";layer;iphi;it", usedLayer.size() + 2, usedLayer[0] - 1.5, *usedLayer.rbegin() + 1.5, usedIPhi.size() + 2, usedIPhi[0] - 1.5, *usedIPhi.rbegin() + 1.5, usedIT.size() + 2, usedIT[0] - 1.5, *usedIT.rbegin() + 1.5);
+
+      // TH3D *hitHist = new TH3D(Form("hitHist_event%d_side%d_sector%d_module%d_cluster%d",my_data.eventNum,(int)my_data.side,(int)my_data.sector,(int)my_data.module,(int)my_data.cluster_vector.size()),";layer;iphi;it",usedLayer.size()+2,usedLayer[0]-1.5,*usedLayer.rbegin()+1.5,usedIPhi.size()+2,usedIPhi[0]-1.5,*usedIPhi.rbegin()+1.5,usedIT.size()+2,usedIT[0]-1.5,*usedIT.rbegin()+1.5);
+
+      for (int i = 0; i < (int) clus->getNhits(); i++)
+      {
+        LaserClusterHitInfo LCHI = clus->getHit(i);
+        uint8_t layer = TrkrDefs::getLayer(LCHI.hitsetkey);
+        uint16_t iphi = TpcDefs::getPad(LCHI.hitkey);
+        uint16_t it = TpcDefs::getTBin(LCHI.hitkey);
+        my_data.hitHist->Fill(layer, iphi, it, LCHI.adc);
+      }
+
+      bool fitSuccess = false;
+      ROOT::Fit::Fitter *fit3D = new ROOT::Fit::Fitter;
+
       double par_init[7] = {
           maxAdc,
           meanLayer,
@@ -714,121 +715,62 @@ namespace
       {
         std::cout << "fit success: " << fitSuccess << std::endl;
       }
-    }
-    pthread_mutex_unlock(&mythreadlock);
-
-    if (my_data.doFitting && fitSuccess)
-    {
-      const ROOT::Fit::FitResult &result = fit3D->Result();
-
-      PHG4TpcGeom *layergeomLow = my_data.geom_container->GetLayerCellGeom((int) floor(result.Parameter(1)));
-      PHG4TpcGeom *layergeomHigh = my_data.geom_container->GetLayerCellGeom((int) ceil(result.Parameter(1)));
-
-      double RLow = layergeomLow->get_radius();
-      double RHigh = layergeomHigh->get_radius();
-
-      double phiHigh_RLow = -999.0;
-      if (ceil(result.Parameter(2)) < layergeomLow->get_phibins())
+    
+      if (fitSuccess)
       {
-        phiHigh_RLow = layergeomLow->get_phi(ceil(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
-      }
-      double phiHigh_RHigh = -999.0;
-      if (ceil(result.Parameter(2)) < layergeomHigh->get_phibins())
-      {
-        phiHigh_RHigh = layergeomHigh->get_phi(ceil(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
-      }
+        const ROOT::Fit::FitResult &result = fit3D->Result();
 
-      double phiLow_RLow = layergeomLow->get_phi(floor(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
-      double phiLow_RHigh = layergeomHigh->get_phi(floor(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
+        PHG4TpcGeom *layergeomLow = my_data.geom_container->GetLayerCellGeom((int) floor(result.Parameter(1)));
+        PHG4TpcGeom *layergeomHigh = my_data.geom_container->GetLayerCellGeom((int) ceil(result.Parameter(1)));
 
-      double meanR = (result.Parameter(1) - floor(result.Parameter(1))) * (RHigh - RLow) + RLow;
+        //double RLow = layergeomLow->get_radius();
+        //double RHigh = layergeomHigh->get_radius();
 
-      double meanPhi_RLow = ((result.Parameter(2) - floor(result.Parameter(2)))) * (phiHigh_RLow - phiLow_RLow) + phiLow_RLow;
-      double meanPhi_RHigh = ((result.Parameter(2) - floor(result.Parameter(2)))) * (phiHigh_RHigh - phiLow_RHigh) + phiLow_RHigh;
+        double phiHigh_RLow = -999.0;
+        if (ceil(result.Parameter(2)) < layergeomLow->get_phibins())
+        {
+          phiHigh_RLow = layergeomLow->get_phi(ceil(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
+        }
+        double phiHigh_RHigh = -999.0;
+        if (ceil(result.Parameter(2)) < layergeomHigh->get_phibins())
+        {
+          phiHigh_RHigh = layergeomHigh->get_phi(ceil(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
+        }
 
-      double meanPhi = 0.5 * (meanPhi_RLow + meanPhi_RHigh);
-      if (phiHigh_RLow == -999.0 && phiHigh_RHigh != -999.0)
-      {
-        meanPhi = meanPhi_RHigh;
-      }
-      else if (phiHigh_RLow != -999.0 && phiHigh_RHigh == -999.0)
-      {
-        meanPhi = meanPhi_RLow;
-      }
+        //double phiLow_RLow = layergeomLow->get_phi(floor(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
+        //double phiLow_RHigh = layergeomHigh->get_phi(floor(result.Parameter(2)), (meanSide < 0 ? 0 : 1));
 
-      if (phiHigh_RLow == -999.0 && phiHigh_RHigh == -999.0)
-      {
-        clus->setAdc(adcSum);
-        clus->setX(clusX);
-        clus->setY(clusY);
-        clus->setZ(clusZ);
-        clus->setFitMode(false);
-        clus->setLayer(layerSum / adcSum);
-        clus->setIPhi(iphiSum / adcSum);
-        clus->setIT(itSum / adcSum);
-        clus->setNLayers(usedLayer.size());
-        clus->setNIPhi(usedIPhi.size());
-        clus->setNIT(usedIT.size());
-        clus->setSDLayer(sqrt(sigmaLayer / nHits));
-        clus->setSDIPhi(sqrt(sigmaIPhi / nHits));
-        clus->setSDIT(sqrt(sigmaIT / nHits));
-        clus->setSDWeightedLayer(sqrt(sigmaWeightedLayer / adcSum));
-        clus->setSDWeightedIPhi(sqrt(sigmaWeightedIPhi / adcSum));
-        clus->setSDWeightedIT(sqrt(sigmaWeightedIT / adcSum));
+        if (phiHigh_RLow == -999.0 && phiHigh_RHigh == -999.0)
+        {
+          clus->setFitMode(false);
+        }
+        else
+        {
+          clus->setFitMode(true);
+          clus->setLayer(result.Parameter(1));
+          clus->setIPhi(result.Parameter(2));
+          clus->setIT(result.Parameter(4));
+          clus->setSDWeightedLayer(sqrt(sigmaWeightedLayer / adcSum));
+          clus->setSDWeightedIPhi(result.Parameter(3));
+          clus->setSDWeightedIT(result.Parameter(5));
+        }
       }
-      else
+      
+      delete fit3D;
+      if (my_data.hitHist)
       {
-        clus->setAdc(adcSum);
-        clus->setX(meanR * cos(meanPhi));
-        clus->setY(meanR * sin(meanPhi));
-        clus->setZ(clusZ);
-        clus->setFitMode(true);
-        clus->setLayer(result.Parameter(1));
-        clus->setIPhi(result.Parameter(2));
-        clus->setIT(result.Parameter(4));
-        clus->setNLayers(usedLayer.size());
-        clus->setNIPhi(usedIPhi.size());
-        clus->setNIT(usedIT.size());
-        clus->setSDLayer(sqrt(sigmaLayer / nHits));
-        clus->setSDIPhi(sqrt(sigmaIPhi / nHits));
-        clus->setSDIT(sqrt(sigmaIT / nHits));
-        clus->setSDWeightedLayer(sqrt(sigmaWeightedLayer / adcSum));
-        clus->setSDWeightedIPhi(result.Parameter(3));
-        clus->setSDWeightedIT(result.Parameter(5));
+        delete my_data.hitHist;
+        my_data.hitHist = nullptr;
       }
-    }
-    else
-    {
-      clus->setAdc(adcSum);
-      clus->setX(clusX);
-      clus->setY(clusY);
-      clus->setZ(clusZ);
-      clus->setFitMode(false);
-      clus->setLayer(layerSum / adcSum);
-      clus->setIPhi(iphiSum / adcSum);
-      clus->setIT(itSum / adcSum);
-      clus->setNLayers(usedLayer.size());
-      clus->setNIPhi(usedIPhi.size());
-      clus->setNIT(usedIT.size());
-      clus->setSDLayer(sqrt(sigmaLayer / nHits));
-      clus->setSDIPhi(sqrt(sigmaIPhi / nHits));
-      clus->setSDIT(sqrt(sigmaIT / nHits));
-      clus->setSDWeightedLayer(sqrt(sigmaWeightedLayer / adcSum));
-      clus->setSDWeightedIPhi(sqrt(sigmaWeightedIPhi / adcSum));
-      clus->setSDWeightedIT(sqrt(sigmaWeightedIT / adcSum));
+      pthread_mutex_unlock(&mythreadlock);
     }
 
-    const auto ckey = TrkrDefs::genClusKey(maxKey, my_data.cluster_vector.size());
+    pthread_mutex_lock(&mythreadlock);
+    const auto ckey = TrkrDefs::genClusKey(maxKey, my_data.cluster_vector.size());    
     my_data.cluster_vector.push_back(clus);
     my_data.cluster_key_vector.push_back(ckey);
+    pthread_mutex_unlock(&mythreadlock);
 
-    delete fit3D;
-
-    if (my_data.hitHist)
-    {
-      delete my_data.hitHist;
-      my_data.hitHist = nullptr;
-    }
   }
 
   void ProcessModuleData(thread_data *my_data)
@@ -861,7 +803,7 @@ namespace
 
       for (TrkrHitSet::ConstIterator hitr = hitrangei.first; hitr != hitrangei.second; ++hitr)
       {
-        float_t fadc = hitr->second->getAdc();
+        double_t fadc = hitr->second->getAdc();
         unsigned short adc = 0;
         if (fadc > my_data->adc_threshold)
         {
@@ -995,6 +937,7 @@ int LaserClusterizer::InitRun(PHCompositeNode *topNode)
   // get the first layer to get the clock freq
   AdcClockPeriod = m_geom_container->GetFirstLayerCellGeom()->get_zstep();
   m_tdriftmax = AdcClockPeriod * NZBinsSide;
+  
 
   return Fun4AllReturnCodes::EVENT_OK;
 }

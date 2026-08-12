@@ -10,7 +10,6 @@ class TrkrCluster;
 class ActsGeometry
 {
  public:
-  ActsGeometry() = default;
   ~ActsGeometry() = default;
 
   void setGeometry(const ActsTrackingGeometry& tGeometry)
@@ -52,6 +51,7 @@ class ActsGeometry
   void set_CM_halfwidth(double val) { _CM_halfwidth = val; }
   void set_tpc_tzero(double tz) { _tpc_tzero = tz; }
   void set_sampa_tzero_bias(double tzb) { _sampa_tzero_bias = tzb; }
+  void set_tpc_world_envelope_transform(Acts::Transform3 transf) { m_tpc_world_envelope_transform = transf; }
 
   double get_tpc_tzero() const { return _tpc_tzero; }
   double get_sampa_tzero_bias() const { return _sampa_tzero_bias; }
@@ -73,10 +73,18 @@ class ActsGeometry
 
   Surface get_tpc_surface_from_coords(
       TrkrDefs::hitsetkey hitsetkey,
-      Acts::Vector3 world,
+      Acts::Vector3 cluster,
       TrkrDefs::subsurfkey& subsurfkey) const ;
 
+  Surface get_clusterizer_tpc_surface(
+      TrkrDefs::hitsetkey hitsetkey,
+      Acts::Vector3 clus_envelope,
+      TrkrDefs::subsurfkey& subsurfkey) const;
+    
   Acts::Transform3 makeAffineTransform(Acts::Vector3 rotation, Acts::Vector3 translation) const;
+
+  Acts::Vector3 transformTpcWorldToEnvelope(const Acts::Vector3& world) const ;
+  Acts::Vector3 transformTpcEnvelopeToWorld(const Acts::Vector3& envelope) const ;
 
   Acts::Vector2 getLocalCoords(TrkrDefs::cluskey key, TrkrCluster* cluster) const;
   Acts::Vector2 getLocalCoords(TrkrDefs::cluskey key, TrkrCluster* cluster, short int crossing) const;
@@ -84,6 +92,8 @@ class ActsGeometry
  private:
   ActsTrackingGeometry m_tGeometry;
   ActsSurfaceMaps m_surfMaps;
+  Acts::Transform3 m_tpc_world_envelope_transform;
+  Acts::Transform3 m_tpc_envelope_world_transform;
   double _drift_velocity = 8.0e-3;  // cm/ns
   double _max_driftlength = 102.235;  // cm
   double _CM_halfwidth = 0.28;  // cm

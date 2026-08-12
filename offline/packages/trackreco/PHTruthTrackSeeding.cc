@@ -120,7 +120,10 @@ int PHTruthTrackSeeding::Process(PHCompositeNode* topNode)
   std::vector<TrkrDefs::cluskey> ClusterKeyListSilicon;
   std::vector<TrkrDefs::cluskey> ClusterKeyListTpc;
 
-  PHG4TruthInfoContainer::ConstRange range = m_g4truth_container->GetPrimaryParticleRange();
+  PHG4TruthInfoContainer::ConstRange range =
+      m_include_secondaries
+          ? m_g4truth_container->GetParticleRange()
+          : m_g4truth_container->GetPrimaryParticleRange();
   for (PHG4TruthInfoContainer::ConstIterator iter = range.first;
        iter != range.second;
        ++iter)
@@ -252,6 +255,8 @@ void PHTruthTrackSeeding::buildTrackSeed(const std::vector<TrkrDefs::cluskey>& c
   // This method is called separately for silicon and tpc seeds
 
   auto track = std::make_unique<TrackSeed_FastSim_v2>();
+  track->set_truth_track_id(g4particle->get_track_id());
+
   bool silicon = false;
   bool tpc = false;
   for (const auto& cluskey : clusters)
